@@ -15,6 +15,7 @@ interface Post {
 interface Group {
   id: number;
   lastCheckedDate: number;
+  offset: number; // Add this line
 }
 
 interface StoredPost {
@@ -41,6 +42,7 @@ class VKGroupMonitor {
     this.groups = groupIds.map((id) => ({
       id,
       lastCheckedDate: Math.floor(Date.now() / 1000),
+      offset: 0, // Add this line
     }));
 
     if (!this.accessToken) {
@@ -77,12 +79,13 @@ class VKGroupMonitor {
   private async restoreState(): Promise<void> {
     for (const group of this.groups) {
       try {
-        const lastCheckedDate = await this.stateDb.get(`group_${group.id}`);
-        group.lastCheckedDate = lastCheckedDate;
+        const state = await this.stateDb.get(`group_${group.id}`);
+        group.lastCheckedDate = state.lastCheckedDate;
+        group.offset = state.offset; // Add this line
         console.log(
           `Restored state for group ${group.id}: last checked at ${new Date(
-            lastCheckedDate * 1000,
-          )}`,
+            group.lastCheckedDate * 1000,
+          )}, offset: ${group.offset}`,
         );
       } catch (error) {
         if ((error as any).code !== "LEVEL_NOT_FOUND") {
@@ -95,9 +98,10 @@ class VKGroupMonitor {
   private async saveState(
     groupId: number,
     lastCheckedDate: number,
+    offset: number, // Add this parameter
   ): Promise<void> {
     try {
-      await this.stateDb.put(`group_${groupId}`, lastCheckedDate);
+      await this.stateDb.put(`group_${groupId}`, { lastCheckedDate, offset });
     } catch (error) {
       console.error(`Error saving state for group ${groupId}:`, error);
     }
@@ -106,19 +110,18 @@ class VKGroupMonitor {
   private async pollGroups(): Promise<void> {
     for (const group of this.groups) {
       await this.checkGroupPosts(group);
-      await this.saveState(group.id, group.lastCheckedDate);
+      await this.saveState(group.id, group.lastCheckedDate, group.offset);
     }
 
     setTimeout(() => this.pollGroups(), this.pollInterval);
   }
 
   private async checkGroupPosts(group: Group): Promise<void> {
-    let offset = 0;
     let hasMorePosts = true;
 
     while (hasMorePosts) {
       try {
-        const response = await this.fetchPosts(group.id, offset);
+        const response = await this.fetchPosts(group.id, group.offset);
         const posts: Post[] = response.items;
 
         if (posts.length === 0) {
@@ -136,13 +139,17 @@ class VKGroupMonitor {
         }
 
         group.lastCheckedDate = Math.max(group.lastCheckedDate, posts[0].date);
-        await this.saveState(group.id, group.lastCheckedDate);
-        offset += this.postsPerRequest;
+        group.offset += this.postsPerRequest; // Update the offset
+        await this.saveState(group.id, group.lastCheckedDate, group.offset);
       } catch (error) {
         console.error(`Error fetching posts for group ${group.id}:`, error);
         hasMorePosts = false;
       }
     }
+
+    // Reset offset after processing all posts
+    group.offset = 0;
+    await this.saveState(group.id, group.lastCheckedDate, group.offset);
   }
 
   private async fetchPosts(
