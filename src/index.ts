@@ -23,14 +23,34 @@ interface StoredPost {
   rewritten: string;
 }
 
+interface ProcessedPost {
+  id: number;
+  groupId: number;
+  original: string;
+  rewritten: string;
+}
+
+interface VKGroupMonitorEvents {
+  newPost: (post: Post) => void;
+  postProcessed: (processedPost: ProcessedPost) => void;
+  postAlreadyProcessed: (storedPost: StoredPost) => void;
+  error: (error: Error) => void;
+}
+
 class VKGroupMonitor extends EventEmitter {
-  private groups: Map<number, GroupState>;
   private accessToken: string;
   private pollInterval: number;
   private postsPerRequest: number;
+
+  // OLLAMA client
   private ollama: Ollama;
+
+  // LevelDB for posts
   private postsDb: Level<string, StoredPost>;
-  private stateDb: Level<string, GroupState>;
+
+  // LevelDB for groups state
+  private groupsState: Map<number, GroupState>;
+  private groupsStateDb: Level<string, GroupState>;
 
   constructor() {
     super(); // Call EventEmitter constructor
@@ -39,7 +59,7 @@ class VKGroupMonitor extends EventEmitter {
     this.pollInterval = Number(process.env.POLL_INTERVAL) || 60000;
     this.postsPerRequest = Number(process.env.POSTS_PER_REQUEST) || 100;
 
-    this.groups = new Map(
+    this.groupsState = new Map(
       groupIds.map((id) => [
         id,
         {
@@ -72,7 +92,7 @@ class VKGroupMonitor extends EventEmitter {
     });
 
     // Initialize LevelDB for state
-    this.stateDb = new Level<string, GroupState>("./state", {
+    this.groupsStateDb = new Level<string, GroupState>("./state", {
       valueEncoding: "json",
     });
   }
@@ -83,9 +103,9 @@ class VKGroupMonitor extends EventEmitter {
   }
 
   private async restoreState(): Promise<void> {
-    for (const [groupId, group] of this.groups) {
+    for (const [groupId, group] of this.groupsState) {
       try {
-        const state = await this.stateDb.get(`group_${groupId}`);
+        const state = await this.groupsStateDb.get(`group_${groupId}`);
         group.lastCheckedDate = state.lastCheckedDate;
         group.offset = state.offset;
         console.log(
@@ -107,14 +127,17 @@ class VKGroupMonitor extends EventEmitter {
     offset: number,
   ): Promise<void> {
     try {
-      await this.stateDb.put(`group_${groupId}`, { lastCheckedDate, offset });
+      await this.groupsStateDb.put(`group_${groupId}`, {
+        lastCheckedDate,
+        offset,
+      });
     } catch (error) {
       console.error(`Error saving state for group ${groupId}:`, error);
     }
   }
 
   private async pollGroups(): Promise<void> {
-    for (const [groupId, group] of this.groups) {
+    for (const [groupId, group] of this.groupsState) {
       await this.checkGroupPosts(groupId, group);
       await this.saveState(groupId, group.lastCheckedDate, group.offset);
     }
@@ -213,13 +236,15 @@ class VKGroupMonitor extends EventEmitter {
       });
     } catch (error) {
       console.error("Error processing post:", error);
-      this.emit("error", error);
+      this.emit(
+        "error",
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
   private async rewritePostWithOllama(text: string): Promise<string> {
-    const prompt =
-      process.env.OLLAMA_PROMPT ||
+    const prompt = process.env.OLLAMA_PROMPT ||
       `Rewrite the following social media post in a more engaging way, keeping the main message intact:\n\n${text}`;
 
     try {
@@ -258,20 +283,20 @@ class VKGroupMonitor extends EventEmitter {
 // Usage example:
 const groupMonitor = new VKGroupMonitor();
 
-// Event listeners
-groupMonitor.on("newPost", (post) => {
+// Event listeners with type checking
+groupMonitor.on("newPost", (post: Post) => {
   console.log("New post detected:", post.id);
 });
 
-groupMonitor.on("postProcessed", (processedPost) => {
+groupMonitor.on("postProcessed", (processedPost: ProcessedPost) => {
   console.log("Post processed:", processedPost.id);
 });
 
-groupMonitor.on("postAlreadyProcessed", (storedPost) => {
+groupMonitor.on("postAlreadyProcessed", (storedPost: StoredPost) => {
   console.log("Post already processed:", storedPost.groupId);
 });
 
-groupMonitor.on("error", (error) => {
+groupMonitor.on("error", (error: Error) => {
   console.error("An error occurred:", error);
 });
 
