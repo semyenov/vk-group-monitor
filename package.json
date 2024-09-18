@@ -1,0 +1,17 @@
+{
+  "name": "vk",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@vkontakte/vk-bridge": "^2.15.0",
+    "dotenv": "^16.4.5",
+    "level": "^8.0.1",
+    "ollama": "^0.5.9"
+  }
+}
