@@ -12,8 +12,7 @@ interface Post {
   text: string;
 }
 
-interface Group {
-  id: number;
+interface GroupState {
   lastCheckedDate: number;
   offset: number;
 }
@@ -25,13 +24,13 @@ interface StoredPost {
 }
 
 class VKGroupMonitor extends EventEmitter {
-  private groups: Group[];
+  private groups: Map<number, GroupState>;
   private accessToken: string;
   private pollInterval: number;
   private postsPerRequest: number;
   private ollama: Ollama;
   private postsDb: Level<string, StoredPost>;
-  private stateDb: Level<string, { lastCheckedDate: number; offset: number }>;
+  private stateDb: Level<string, GroupState>;
 
   constructor() {
     super(); // Call EventEmitter constructor
@@ -40,11 +39,15 @@ class VKGroupMonitor extends EventEmitter {
     this.pollInterval = Number(process.env.POLL_INTERVAL) || 60000;
     this.postsPerRequest = Number(process.env.POSTS_PER_REQUEST) || 100;
 
-    this.groups = groupIds.map((id) => ({
-      id,
-      lastCheckedDate: Math.floor(Date.now() / 1000),
-      offset: 0,
-    }));
+    this.groups = new Map(
+      groupIds.map((id) => [
+        id,
+        {
+          lastCheckedDate: Math.floor(Date.now() / 1000),
+          offset: 0,
+        },
+      ]),
+    );
 
     if (!this.accessToken) {
       throw new Error(
@@ -69,13 +72,9 @@ class VKGroupMonitor extends EventEmitter {
     });
 
     // Initialize LevelDB for state
-    this.stateDb = new Level<
-      string,
-      { lastCheckedDate: number; offset: number }
-    >(
-      "./state",
-      { valueEncoding: "json" },
-    );
+    this.stateDb = new Level<string, GroupState>("./state", {
+      valueEncoding: "json",
+    });
   }
 
   public async start(): Promise<void> {
@@ -84,19 +83,19 @@ class VKGroupMonitor extends EventEmitter {
   }
 
   private async restoreState(): Promise<void> {
-    for (const group of this.groups) {
+    for (const [groupId, group] of this.groups) {
       try {
-        const state = await this.stateDb.get(`group_${group.id}`);
+        const state = await this.stateDb.get(`group_${groupId}`);
         group.lastCheckedDate = state.lastCheckedDate;
         group.offset = state.offset;
         console.log(
-          `Restored state for group ${group.id}: last checked at ${new Date(
+          `Restored state for group ${groupId}: last checked at ${new Date(
             group.lastCheckedDate * 1000,
           )}, offset: ${group.offset}`,
         );
       } catch (error) {
-        if ((error as any).code !== "LEVEL_NOT_FOUND") {
-          console.error(`Error restoring state for group ${group.id}:`, error);
+        if ((error as { code: string }).code !== "LEVEL_NOT_FOUND") {
+          console.error(`Error restoring state for group ${groupId}:`, error);
         }
       }
     }
@@ -115,20 +114,23 @@ class VKGroupMonitor extends EventEmitter {
   }
 
   private async pollGroups(): Promise<void> {
-    for (const group of this.groups) {
-      await this.checkGroupPosts(group);
-      await this.saveState(group.id, group.lastCheckedDate, group.offset);
+    for (const [groupId, group] of this.groups) {
+      await this.checkGroupPosts(groupId, group);
+      await this.saveState(groupId, group.lastCheckedDate, group.offset);
     }
 
     setTimeout(() => this.pollGroups(), this.pollInterval);
   }
 
-  private async checkGroupPosts(group: Group): Promise<void> {
+  private async checkGroupPosts(
+    groupId: number,
+    group: GroupState,
+  ): Promise<void> {
     let hasMorePosts = true;
 
     while (hasMorePosts) {
       try {
-        const response = await this.fetchPosts(group.id, group.offset);
+        const response = await this.fetchPosts(groupId, group.offset);
         const posts: Post[] = response.items;
 
         if (posts.length === 0) {
@@ -138,7 +140,7 @@ class VKGroupMonitor extends EventEmitter {
 
         for (const post of posts) {
           if (post.date > group.lastCheckedDate) {
-            await this.processNewPost(post, group.id);
+            await this.processNewPost(post, groupId);
           } else {
             hasMorePosts = false;
             break;
@@ -147,16 +149,16 @@ class VKGroupMonitor extends EventEmitter {
 
         group.lastCheckedDate = Math.max(group.lastCheckedDate, posts[0].date);
         group.offset += this.postsPerRequest; // Update the offset
-        await this.saveState(group.id, group.lastCheckedDate, group.offset);
+        await this.saveState(groupId, group.lastCheckedDate, group.offset);
       } catch (error) {
-        console.error(`Error fetching posts for group ${group.id}:`, error);
+        console.error(`Error fetching posts for group ${groupId}:`, error);
         hasMorePosts = false;
       }
     }
 
     // Reset offset after processing all posts
     group.offset = 0;
-    await this.saveState(group.id, group.lastCheckedDate, group.offset);
+    await this.saveState(groupId, group.lastCheckedDate, group.offset);
   }
 
   private async fetchPosts(
@@ -164,7 +166,7 @@ class VKGroupMonitor extends EventEmitter {
     offset: number,
   ): Promise<{ items: Post[] }> {
     try {
-      const response = await bridge.send("VKWebAppCallAPIMethod", {
+      const response = await bridge.default.send("VKWebAppCallAPIMethod", {
         method: "wall.get",
         params: {
           owner_id: -groupId,
@@ -216,7 +218,8 @@ class VKGroupMonitor extends EventEmitter {
   }
 
   private async rewritePostWithOllama(text: string): Promise<string> {
-    const prompt = process.env.OLLAMA_PROMPT ||
+    const prompt =
+      process.env.OLLAMA_PROMPT ||
       `Rewrite the following social media post in a more engaging way, keeping the main message intact:\n\n${text}`;
 
     try {
@@ -235,7 +238,7 @@ class VKGroupMonitor extends EventEmitter {
     try {
       return await this.postsDb.get(postId);
     } catch (error) {
-      if ((error as any).code === "LEVEL_NOT_FOUND") {
+      if ((error as { code: string }).code === "LEVEL_NOT_FOUND") {
         return undefined;
       }
       throw error;
@@ -272,9 +275,9 @@ groupMonitor.on("error", (error) => {
   console.error("An error occurred:", error);
 });
 
-groupMonitor.start().catch((error) =>
-  console.error("Error starting VKGroupMonitor:", error)
-);
+groupMonitor
+  .start()
+  .catch((error) => console.error("Error starting VKGroupMonitor:", error));
 
 // Graceful shutdown handler
 process.on("SIGINT", async () => {

@@ -3,7 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "esbuild ./src/index.ts --bundle --outdir=./dist",
+    "build": "esbuild ./src/index.ts --bundle --outdir=./dist --platform=node",
     "start": "node ./dist/index.js"
   },
   "devDependencies": {
