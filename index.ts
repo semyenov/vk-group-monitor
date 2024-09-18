@@ -2,6 +2,7 @@ import bridge from "@vkontakte/vk-bridge";
 import dotenv from "dotenv";
 import { Ollama } from "ollama";
 import { Level } from "level";
+import { EventEmitter } from "events";
 
 dotenv.config();
 
@@ -9,13 +10,12 @@ interface Post {
   id: number;
   date: number;
   text: string;
-  // Add other relevant post fields
 }
 
 interface Group {
   id: number;
   lastCheckedDate: number;
-  offset: number; // Add this line
+  offset: number;
 }
 
 interface StoredPost {
@@ -24,16 +24,17 @@ interface StoredPost {
   rewritten: string;
 }
 
-class VKGroupMonitor {
+class VKGroupMonitor extends EventEmitter {
   private groups: Group[];
   private accessToken: string;
   private pollInterval: number;
   private postsPerRequest: number;
   private ollama: Ollama;
-  private db: Level<string, StoredPost>;
-  private stateDb: Level<string, number>;
+  private postsDb: Level<string, StoredPost>;
+  private stateDb: Level<string, { lastCheckedDate: number; offset: number }>;
 
   constructor() {
+    super(); // Call EventEmitter constructor
     const groupIds = process.env.GROUP_IDS?.split(",").map(Number) || [];
     this.accessToken = process.env.VK_ACCESS_TOKEN || "";
     this.pollInterval = Number(process.env.POLL_INTERVAL) || 60000;
@@ -42,7 +43,7 @@ class VKGroupMonitor {
     this.groups = groupIds.map((id) => ({
       id,
       lastCheckedDate: Math.floor(Date.now() / 1000),
-      offset: 0, // Add this line
+      offset: 0,
     }));
 
     if (!this.accessToken) {
@@ -63,12 +64,18 @@ class VKGroupMonitor {
     });
 
     // Initialize LevelDB for posts
-    this.db = new Level<string, StoredPost>("./db", { valueEncoding: "json" });
-
-    // Initialize LevelDB for state
-    this.stateDb = new Level<string, number>("./state", {
+    this.postsDb = new Level<string, StoredPost>("./db", {
       valueEncoding: "json",
     });
+
+    // Initialize LevelDB for state
+    this.stateDb = new Level<
+      string,
+      { lastCheckedDate: number; offset: number }
+    >(
+      "./state",
+      { valueEncoding: "json" },
+    );
   }
 
   public async start(): Promise<void> {
@@ -81,7 +88,7 @@ class VKGroupMonitor {
       try {
         const state = await this.stateDb.get(`group_${group.id}`);
         group.lastCheckedDate = state.lastCheckedDate;
-        group.offset = state.offset; // Add this line
+        group.offset = state.offset;
         console.log(
           `Restored state for group ${group.id}: last checked at ${new Date(
             group.lastCheckedDate * 1000,
@@ -98,7 +105,7 @@ class VKGroupMonitor {
   private async saveState(
     groupId: number,
     lastCheckedDate: number,
-    offset: number, // Add this parameter
+    offset: number,
   ): Promise<void> {
     try {
       await this.stateDb.put(`group_${groupId}`, { lastCheckedDate, offset });
@@ -160,11 +167,11 @@ class VKGroupMonitor {
       const response = await bridge.send("VKWebAppCallAPIMethod", {
         method: "wall.get",
         params: {
-          owner_id: -groupId, // Negative ID for groups
+          owner_id: -groupId,
           count: this.postsPerRequest,
           offset: offset,
           access_token: this.accessToken,
-          v: "5.131", // API version
+          v: "5.131",
         },
       });
       return response.response;
@@ -180,8 +187,11 @@ class VKGroupMonitor {
       const storedPost = await this.getStoredPost(post.id.toString());
       if (storedPost) {
         console.log("Post already processed:", storedPost);
+        this.emit("postAlreadyProcessed", storedPost);
         return;
       }
+
+      this.emit("newPost", post);
 
       const rewrittenText = await this.rewritePostWithOllama(post.text);
       console.log("Rewritten post:", rewrittenText);
@@ -193,15 +203,20 @@ class VKGroupMonitor {
         rewrittenText,
       );
 
-      // Here you can implement logic to post the rewritten text back to VK
-      // or perform further processing
+      this.emit("postProcessed", {
+        id: post.id,
+        groupId,
+        original: post.text,
+        rewritten: rewrittenText,
+      });
     } catch (error) {
       console.error("Error processing post:", error);
+      this.emit("error", error);
     }
   }
 
   private async rewritePostWithOllama(text: string): Promise<string> {
-    const prompt =
+    const prompt = process.env.OLLAMA_PROMPT ||
       `Rewrite the following social media post in a more engaging way, keeping the main message intact:\n\n${text}`;
 
     try {
@@ -218,7 +233,7 @@ class VKGroupMonitor {
 
   private async getStoredPost(postId: string): Promise<StoredPost | undefined> {
     try {
-      return await this.db.get(postId);
+      return await this.postsDb.get(postId);
     } catch (error) {
       if ((error as any).code === "LEVEL_NOT_FOUND") {
         return undefined;
@@ -233,12 +248,30 @@ class VKGroupMonitor {
     original: string,
     rewritten: string,
   ): Promise<void> {
-    await this.db.put(postId, { groupId, original, rewritten });
+    await this.postsDb.put(postId, { groupId, original, rewritten });
   }
 }
 
 // Usage example:
 const groupMonitor = new VKGroupMonitor();
+
+// Event listeners
+groupMonitor.on("newPost", (post) => {
+  console.log("New post detected:", post.id);
+});
+
+groupMonitor.on("postProcessed", (processedPost) => {
+  console.log("Post processed:", processedPost.id);
+});
+
+groupMonitor.on("postAlreadyProcessed", (storedPost) => {
+  console.log("Post already processed:", storedPost.groupId);
+});
+
+groupMonitor.on("error", (error) => {
+  console.error("An error occurred:", error);
+});
+
 groupMonitor.start().catch((error) =>
   console.error("Error starting VKGroupMonitor:", error)
 );
