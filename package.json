@@ -1,17 +1,27 @@
 {
-  "name": "vk",
+  "name": "vk-group-monitor",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "build": "esbuild ./src/index.ts --bundle --outdir=./dist",
+    "start": "node ./dist/index.js"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "esbuild": "^0.23.1"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
     "@vkontakte/vk-bridge": "^2.15.0",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
+    "events": "^3.3.0",
+    "fs": "^0.0.1-security",
     "level": "^8.0.1",
-    "ollama": "^0.5.9"
+    "ollama": "^0.5.9",
+    "os": "^0.1.2",
+    "path": "^0.12.7"
   }
 }
