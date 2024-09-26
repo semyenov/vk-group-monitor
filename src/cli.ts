@@ -143,5 +143,7 @@ listen(toNodeListener(app), {
 
 process.on("SIGINT", async () => {
   console.log("Завершение работы...");
+  await monitor.stop();
+
   process.exit(0);
 });

@@ -110,7 +110,7 @@ interface Post {
   text: string;
 }
 
-interface Group {
+interface VKGroupMonitorGroup {
   id: number;
   lastCheckedDate: number;
   offset: number;
@@ -143,7 +143,10 @@ interface VKGroupMonitorEvents {
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private clientId: string = randomUUID();
-  private state: Map<number, Pick<Group, "lastCheckedDate" | "offset">>;
+  private state: Map<
+    number,
+    Pick<VKGroupMonitorGroup, "lastCheckedDate" | "offset">
+  >;
 
   // API keys
   private gigaChatApiKey: string;
@@ -160,7 +163,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   // LevelDB
   private postsDb: Level<string, VKGroupMonitorPost>;
-  private groupsDb: Level<string, Group>;
+  private groupsDb: Level<string, VKGroupMonitorGroup>;
 
   constructor(config: VKGroupMonitorConfig) {
     super();
@@ -205,6 +208,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         {
           id,
           offset: 0,
+          count: config.postsPerRequest,
           lastCheckedDate: Date.now() / 1000 - 1000 * 60 * 60 * 24,
         },
       ]),
@@ -213,12 +217,20 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     // Initialize LevelDB
     this.postsDb = new Level<string, VKGroupMonitorPost>(
       config.dbDir + "/posts",
-      { valueEncoding: "json" },
+      {
+        valueEncoding: "json",
+        errorIfExists: false,
+        createIfMissing: true,
+      },
     );
 
-    this.groupsDb = new Level<string, Group>(
+    this.groupsDb = new Level<string, VKGroupMonitorGroup>(
       config.dbDir + "/groups",
-      { valueEncoding: "json" },
+      {
+        valueEncoding: "json",
+        errorIfExists: false,
+        createIfMissing: true,
+      },
     );
   }
 
@@ -226,13 +238,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     await this.updateGroups();
     await this.updateGigachatAccessToken();
 
-    this.poolTimeout = setTimeout(
-      () => this.poll(),
-      this.pollInterval,
-    );
+    await this.poll();
   }
 
-  public async stop(): Promise<void> {
+  public stop(): void {
     if (this.poolTimeout) {
       clearTimeout(this.poolTimeout);
     }
@@ -272,7 +281,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     }
   }
 
-  public async getGroup(groupId: number): Promise<Group | null> {
+  public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
     try {
       const state = await this.groupsDb.get(groupId.toString());
       if (!state) {
@@ -293,8 +302,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     }
   }
 
-  public async getGroups(): Promise<Group[]> {
-    const groups: Group[] = [];
+  public async getGroups(): Promise<VKGroupMonitorGroup[]> {
+    const groups: VKGroupMonitorGroup[] = [];
     for (const groupId of this.state.keys()) {
       const group = await this.getGroup(groupId);
       if (group) {
@@ -342,7 +351,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   private async putGroup(
-    group: Group,
+    group: VKGroupMonitorGroup,
   ): Promise<void> {
     try {
       await this.groupsDb.put(group.id.toString(), group);
@@ -373,7 +382,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   private async fetchGroupPosts(
-    group: Group,
+    group: VKGroupMonitorGroup,
   ): Promise<void> {
     let hasMorePosts = true;
 
@@ -435,6 +444,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       groupIds.push(groupId);
     }
 
+    if (groupIds.length === 0) {
+      return;
+    }
+
     // fetch groups
     const params = new URLSearchParams([
       ["group_ids", groupIds.join(",")],
@@ -457,10 +470,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       );
 
       const json = await response.json() as {
-        response: Omit<Group, "lastCheckedDate" | "offset">[];
+        response?: Omit<VKGroupMonitorGroup, "lastCheckedDate" | "offset">[];
       };
 
-      for (const data of json.response) {
+      for (const data of json.response || []) {
         const group = await this.getGroup(data.id);
         await this.putGroup({
           ...data,
@@ -477,8 +490,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           new Error(message),
         );
       }
-
-      return;
     }
   }
 
@@ -510,10 +521,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       );
 
       const json = await response.json() as {
-        response: { items: Post[] };
+        response?: { items: Post[] };
       };
 
-      for (const post of json.response.items) {
+      for (const post of json.response?.items || []) {
         if (post.text.length > 0 && post.text.length < 10000) {
           posts.push({
             id: Number(post.id),

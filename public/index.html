@@ -6,11 +6,41 @@
     <title>VK Group Monitor Posts</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body class="bg-gray-100 font-sans p-5">
-    <h1 class="text-center text-2xl font-bold text-gray-800 mb-6 drop-shadow-md">VK Group Monitor</h1>
+
+  <body class="bg-slate-200 font-sans">
+    <h1 onclick="fetchPosts(); scrollToTop()" class="cursor-pointer max-w-4xl mx-auto hover:bg-slate-800 transition-colors duration-500 sticky top-0 z-50 px-4 py-3 bg-slate-700 border border-slate-500 text-slate-100 text-center font-semibold rounded-b-xl text-2xl font-bold mb-8 shadow-xl">VK Group Monitor</h1>
     <div id="posts" class="max-w-3xl mx-auto"></div>
 
     <script>
+      function scrollToTop() {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: "smooth",
+        });
+      }
+
+      function toggleOriginal(el) {
+        const original = el.parentElement.querySelector(".original");
+        if (original) {
+          original.classList.toggle("hidden");
+        }
+      }
+
+      function copyToClipboard(el) {
+        const text = el.textContent;
+        const copied = el.parentElement.querySelector(".copied");
+
+        copied.classList.remove("opacity-0");
+        copied.classList.add("opacity-100");
+        navigator.clipboard.writeText(text);
+
+        setTimeout(() => {
+          copied.classList.remove("opacity-100");
+          copied.classList.add("opacity-0");
+        }, 750);
+      }
+
       async function fetchPosts() {
         const postsResponse = await fetch("/api/posts");
         const posts = await postsResponse.json();
@@ -23,30 +53,37 @@
           return groups.data.find((state) => state.id === groupId);
         }
 
+        function formatDate(date) {
+          return new Date(date * 1000).toLocaleString();
+        }
+
         if (posts.success) {
           posts.data.forEach((post) => {
             const postDiv = document.createElement("div");
-            postDiv.className = "bg-white border border-gray-300 rounded-lg mb-4 shadow relative";
+            postDiv.className = "border border-slate-300 rounded-lg mb-4 shadow relative";
             postDiv.innerHTML = `
-              <h2 class="text-blue-600 mb-2 py-2 px-4 relative z-10 w-full border-b border-gray-300 flex items-center justify-between">
+              <h2 onclick="toggleOriginal(this)" class="cursor-pointer select-none text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors duration-500 py-2 px-4 rounded-t-lg relative z-10 w-full border-b border-slate-200 flex items-center justify-between">
                 <div class="flex flex-row items-center">
                   <img
                     src="${groups.success ? getGroupState(post.groupId).photo_50 : ""}"
-                    class="relative h-10 inline-flex py-2 mr-2 rounded-full"
+                    class="relative h-6 w-6 inline-flex mr-2 rounded-full"
                   />
-                  <span class="text-lg font-bold">${groups.success ? getGroupState(post.groupId).name : post.groupId}</span>
+                  <span class="text-xl font-bold">${groups.success ? getGroupState(post.groupId).name : post.groupId}</span>
                 </div>
-                <div class="ml-2 px-2 py-1 rounded-full float-right text-xs text-gray-500 bg-white bg-opacity-80">
-                  ${new Date(post.date * 1000).toLocaleString()}
+                <div class="px-2 py-1 rounded float-right text-xs text-slate-500 hover:text-slate-600 hover:bg-slate-100 font-semibold bg-white border border-slate-300 shadow-sm">
+                  ${formatDate(post.date)}
                 </div>
               </h2>
-              <p class="mb-2 bg-white bg-opacity-80 text-gray-700 py-1 px-4 rounded-md leading-tight">
+              <div onclick="copyToClipboard(this)" class="rewritten relative cursor-default py-4 px-4 bg-white bg-opacity-80 text-slate-700 rounded-md leading-tight relative z-10">
                 ${post.rewritten}
-              </p>
-              <p class="mt-4 py-4 border-t border-dashed border-gray-300 italic text-xs text-gray-500 bg-white bg-opacity-80 py-1 px-4 rounded-md">
-                <b class="text-gray-700">Оригинал:</b>
+                <div class="copied text-3xl z-20 transition-opacity duration-300 flex justify-center items-center absolute top-0 right-0 left-0 bottom-0 bg-slate-200/40 filter backdrop-blur-sm opacity-0 pointer-events-none">
+                  <span class="px-4 py-2 bg-slate-200 uppercase border border-slate-300 text-slate-500 font-semibold shadow-sm bg-white rounded-md text-center">скопировано</span>
+                </div>
+              </div>
+              <div class="original hidden py-4 px-4 border-t border-dashed border-slate-300 italic text-xs text-slate-500 bg-white bg-opacity-80 rounded-md">
+                <b class="text-slate-700">Оригинал:</b>
                 ${post.original}
-              </p>`;
+              </div>`;
 
             postsDiv.appendChild(postDiv);
           });
