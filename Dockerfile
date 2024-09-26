@@ -4,7 +4,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package.json and package-lock.json (if exists)
-COPY package.json yarn.lock ./
+COPY package.json yarn.lock .yarnrc.yml ./
+
+RUN corepack enable yarn
 
 # Install dependencies
 RUN yarn install
@@ -24,10 +26,12 @@ ENV NODE_ENV=production
 
 # Copy built assets from the builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package.json /app/yarn.lock /app/.yarnrc.yml ./
+
+RUN corepack enable yarn
 
 # Install only production dependencies
-RUN yarn install --only=production
+RUN yarn install
 
 # Expose the port your app runs on
 EXPOSE 3000

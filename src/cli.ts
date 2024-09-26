@@ -59,7 +59,7 @@ groupMonitor
 const router = createRouter()
 
 router.get('/', defineEventHandler(async (event) => {
-  return fs.readFileSync('public/index.html', 'utf8');
+  return fs.readFileSync('./public/index.html', 'utf8');
 }))
 
 router.get('/api/post', defineEventHandler(async (event) => {
