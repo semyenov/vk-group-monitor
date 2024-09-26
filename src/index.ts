@@ -1,8 +1,7 @@
-import bridge from "@vkontakte/vk-bridge";
 import dotenv from "dotenv";
-import { Ollama } from "ollama";
 import { Level } from "level";
 import { EventEmitter } from "events";
+import { randomUUID } from "crypto";
 
 dotenv.config();
 
@@ -38,12 +37,11 @@ interface VKGroupMonitorEvents {
 }
 
 class VKGroupMonitor extends EventEmitter {
-  private accessToken: string;
+  private vkAccessToken: string | null = null;
+  private gigaChatAccessToken: string | null = null;
+
   private pollInterval: number;
   private postsPerRequest: number;
-
-  // OLLAMA client
-  private ollama: Ollama;
 
   // LevelDB for posts
   private postsDb: Level<string, StoredPost>;
@@ -55,21 +53,21 @@ class VKGroupMonitor extends EventEmitter {
   constructor() {
     super(); // Call EventEmitter constructor
     const groupIds = process.env.GROUP_IDS?.split(",").map(Number) || [];
-    this.accessToken = process.env.VK_ACCESS_TOKEN || "";
+    this.vkAccessToken = process.env.VK_ACCESS_TOKEN || "";
     this.pollInterval = Number(process.env.POLL_INTERVAL) || 60000;
-    this.postsPerRequest = Number(process.env.POSTS_PER_REQUEST) || 100;
+    this.postsPerRequest = Number(process.env.POSTS_PER_REQUEST) || 10;
 
     this.groupsState = new Map(
       groupIds.map((id) => [
         id,
         {
-          lastCheckedDate: Math.floor(Date.now() / 1000),
+          lastCheckedDate: 0,
           offset: 0,
         },
       ]),
     );
 
-    if (!this.accessToken) {
+    if (!this.vkAccessToken) {
       throw new Error(
         "VK_ACCESS_TOKEN is not set in the environment variables",
       );
@@ -81,25 +79,46 @@ class VKGroupMonitor extends EventEmitter {
       );
     }
 
-    // Initialize Ollama
-    this.ollama = new Ollama({
-      host: process.env.OLLAMA_HOST || "http://localhost:11434",
-    });
-
     // Initialize LevelDB for posts
-    this.postsDb = new Level<string, StoredPost>("./db", {
+    this.postsDb = new Level<string, StoredPost>("./db/posts", {
       valueEncoding: "json",
     });
 
     // Initialize LevelDB for state
-    this.groupsStateDb = new Level<string, GroupState>("./state", {
+    this.groupsStateDb = new Level<string, GroupState>("./db/state", {
       valueEncoding: "json",
     });
   }
 
   public async start(): Promise<void> {
     await this.restoreState();
+    await this.getGigaChatAccessToken();
     this.pollGroups();
+  }
+
+  private async getGigaChatAccessToken(): Promise<string> {
+    try {
+      const response = await fetch("https://ngw.devices.sberbank.ru:9443/api/v2/oauth", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'RqUID': randomUUID(),
+          'Authorization': `Bearer ${process.env.GIGACHAT_API_KEY}`,
+        },
+        body: new URLSearchParams([
+          ['scope', 'GIGACHAT_API_PERS'],
+        ]),
+      });
+
+      const json = await response.json();
+      this.gigaChatAccessToken = json["access_token"];
+
+      return this.gigaChatAccessToken || "";
+    } catch (error) {
+      console.error("Error getting GigaChat access token:", error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
   }
 
   private async restoreState(): Promise<void> {
@@ -116,6 +135,8 @@ class VKGroupMonitor extends EventEmitter {
       } catch (error) {
         if ((error as { code: string }).code !== "LEVEL_NOT_FOUND") {
           console.error(`Error restoring state for group ${groupId}:`, error);
+          this.emit("error", error instanceof Error ? error : new Error(String(error)));
+          throw error;
         }
       }
     }
@@ -133,6 +154,8 @@ class VKGroupMonitor extends EventEmitter {
       });
     } catch (error) {
       console.error(`Error saving state for group ${groupId}:`, error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
   }
 
@@ -153,8 +176,7 @@ class VKGroupMonitor extends EventEmitter {
 
     while (hasMorePosts) {
       try {
-        const response = await this.fetchPosts(groupId, group.offset);
-        const posts: Post[] = response.items;
+        const posts = await this.fetchPosts(groupId, group.offset);
 
         if (posts.length === 0) {
           hasMorePosts = false;
@@ -175,7 +197,9 @@ class VKGroupMonitor extends EventEmitter {
         await this.saveState(groupId, group.lastCheckedDate, group.offset);
       } catch (error) {
         console.error(`Error fetching posts for group ${groupId}:`, error);
+        this.emit("error", error instanceof Error ? error : new Error(String(error)));
         hasMorePosts = false;
+        throw error;
       }
     }
 
@@ -187,39 +211,39 @@ class VKGroupMonitor extends EventEmitter {
   private async fetchPosts(
     groupId: number,
     offset: number,
-  ): Promise<{ items: Post[] }> {
+  ): Promise<Post[]> {
     try {
-      const response = await bridge.default.send("VKWebAppCallAPIMethod", {
-        method: "wall.get",
-        params: {
-          owner_id: -groupId,
-          count: this.postsPerRequest,
-          offset: offset,
-          access_token: this.accessToken,
-          v: "5.131",
-        },
+      const params = new URLSearchParams([
+        ['owner_id', `-${groupId}`],
+        ['count', this.postsPerRequest.toString()],
+        ['offset', offset.toString()],
+        ['access_token', this.vkAccessToken || ''],
+        ['v', '5.131'],
+      ]);
+      const response = await fetch(`https://api.vk.com/method/wall.get?${params.toString()}`, {
+        method: 'GET',
       });
-      return response.response;
+
+      const json = await response.json();
+      return json.response.items;
     } catch (error) {
-      throw new Error(`Failed to fetch posts: ${error}`);
+      console.error(`Error fetching posts for group ${groupId}:`, error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
   }
 
   private async processNewPost(post: Post, groupId: number): Promise<void> {
-    console.log("Original post:", post);
-
     try {
       const storedPost = await this.getStoredPost(post.id.toString());
       if (storedPost) {
-        console.log("Post already processed:", storedPost);
         this.emit("postAlreadyProcessed", storedPost);
         return;
       }
 
       this.emit("newPost", post);
 
-      const rewrittenText = await this.rewritePostWithOllama(post.text);
-      console.log("Rewritten post:", rewrittenText);
+      const rewrittenText = await this.rewritePostWithGigaChat(post.text);
 
       await this.storePost(
         post.id.toString(),
@@ -235,27 +259,12 @@ class VKGroupMonitor extends EventEmitter {
         rewritten: rewrittenText,
       });
     } catch (error) {
-      console.error("Error processing post:", error);
+      console.error(`Error processing post ${post.id} for group ${groupId}:`, error);
       this.emit(
         "error",
         error instanceof Error ? error : new Error(String(error)),
       );
-    }
-  }
-
-  private async rewritePostWithOllama(text: string): Promise<string> {
-    const prompt = process.env.OLLAMA_PROMPT ||
-      `Rewrite the following social media post in a more engaging way, keeping the main message intact:\n\n${text}`;
-
-    try {
-      const response = await this.ollama.generate({
-        model: process.env.OLLAMA_MODEL || "llama2",
-        prompt: prompt,
-      });
-
-      return response.response;
-    } catch (error) {
-      throw new Error(`Failed to rewrite post with Ollama: ${error}`);
+      throw error;
     }
   }
 
@@ -266,6 +275,7 @@ class VKGroupMonitor extends EventEmitter {
       if ((error as { code: string }).code === "LEVEL_NOT_FOUND") {
         return undefined;
       }
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -276,7 +286,54 @@ class VKGroupMonitor extends EventEmitter {
     original: string,
     rewritten: string,
   ): Promise<void> {
-    await this.postsDb.put(postId, { groupId, original, rewritten });
+    try {
+      await this.postsDb.put(postId, { groupId, original, rewritten });
+    } catch (error) {
+      console.error(`Error storing post ${postId} for group ${groupId}:`, error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  private async rewritePostWithGigaChat(text: string): Promise<string> {
+    try {
+      const response = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Id': 'b6874da0-bf06-410b-a150-fd5f9164a0b2',
+          'X-Request-Id': randomUUID(),
+          'X-Session-Id': randomUUID(),
+          'Authorization': `Bearer ${this.gigaChatAccessToken}`,
+        },
+        body: JSON.stringify({
+          model: "GigaChat",
+          stream: false,
+          update_interval: 0,
+          messages: [
+            {
+              role: "system",
+              content: "Пиши текст в стиле, характерном для юристов, адвокатов, судей и прочих профессий, связанных с законодательством.",
+            },
+            {
+              role: "user",
+              content: 'Перепиши текст новости в юморный стиль.',
+            },
+            {
+              role: "user",
+              content: text,
+            },
+          ],
+        }),
+      });
+
+      const json = await response.json();
+      return json.choices[0].message.content;
+    } catch (error) {
+      console.error("Error rewriting post with GigaChat:", error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
   }
 }
 
@@ -285,11 +342,11 @@ const groupMonitor = new VKGroupMonitor();
 
 // Event listeners with type checking
 groupMonitor.on("newPost", (post: Post) => {
-  console.log("New post detected:", post.id);
+  console.log("New post detected:", post.text);
 });
 
 groupMonitor.on("postProcessed", (processedPost: ProcessedPost) => {
-  console.log("Post processed:", processedPost.id);
+  console.log("Post processed:", processedPost.rewritten);
 });
 
 groupMonitor.on("postAlreadyProcessed", (storedPost: StoredPost) => {

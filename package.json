@@ -1,17 +1,30 @@
 {
   "name": "vk-group-monitor",
-  "module": "index.ts",
   "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    "require": {
+      "types": "./dist/index.d.cts",
+      "default": "./dist/index.cjs"
+    },
+    "import": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
   "scripts": {
-    "build": "esbuild ./src/index.ts --bundle --outdir=./dist --platform=node",
-    "start": "node ./dist/index.js"
+    "build": "pkgroll",
+    "start": "node ./dist/index.mjs"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "esbuild": "^0.23.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
+    "@types/uuid": "^10",
+    "esbuild": "^0.23.1",
+    "pkgroll": "^2.5.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "@vkontakte/vk-bridge": "^2.15.0",
@@ -22,6 +35,8 @@
     "level": "^8.0.1",
     "ollama": "^0.5.9",
     "os": "^0.1.2",
-    "path": "^0.12.7"
-  }
+    "path": "^0.12.7",
+    "uuid": "^10.0.0"
+  },
+  "packageManager": "yarn@4.5.0"
 }
