@@ -4,6 +4,7 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
+  "bin": "./dist/cli.js",
   "exports": {
     "require": {
       "types": "./dist/index.d.cts",
@@ -16,27 +17,26 @@
   },
   "scripts": {
     "build": "pkgroll",
-    "start": "node ./dist/index.mjs"
+    "start": "node ./dist/cli.js"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/uuid": "^10",
-    "esbuild": "^0.23.1",
     "pkgroll": "^2.5.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   },
   "dependencies": {
-    "@vkontakte/vk-bridge": "^2.15.0",
+    "@types/js-yaml": "^4.0.9",
     "crypto": "^1.0.1",
-    "dotenv": "^16.4.5",
     "events": "^3.3.0",
     "fs": "^0.0.1-security",
+    "h3": "^1.12.0",
+    "h3-basic-auth": "^0.0.1",
+    "js-yaml": "^4.1.0",
     "level": "^8.0.1",
-    "ollama": "^0.5.9",
-    "os": "^0.1.2",
+    "listhen": "^1.8.0",
+    "node-fetch": "^3.3.2",
     "path": "^0.12.7",
-    "uuid": "^10.0.0"
+    "process": "^0.11.10"
   },
   "packageManager": "yarn@4.5.0"
 }

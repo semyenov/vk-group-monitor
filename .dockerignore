@@ -1,9 +1,25 @@
+# Ignore all files in the db directory
+db/
+
+# Ignore the config.yaml file
+config.yaml
+
+# Ignore the node_modules directory
 node_modules
-npm-debug.log
+
+# Ignore the yarn-debug.log file
 yarn-debug.log
+
+# Ignore the yarn-error.log file
 yarn-error.log
+
+# Ignore the .git directory
 .git
+
+# Ignore the .gitignore file
 .gitignore
+
+# Ignore the .dockerignore file
 .dockerignore
 Dockerfile
 README.md

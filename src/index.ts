@@ -1,9 +1,95 @@
-import dotenv from "dotenv";
 import { Level } from "level";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import https from "https";
+import fetch from "node-fetch";
 
-dotenv.config();
+export interface VKGroupMonitorConfig extends Record<string, unknown> {
+  vkAccessToken: string;
+  groupIds: number[];
+  pollInterval: number;
+  postsPerRequest: number;
+  gigachatApiKey: string;
+  dbDir: string;
+  messages: { role: string; content: string }[];
+}
+
+const httpsAgent = new https.Agent({
+  ca: [Buffer.from(`-----BEGIN CERTIFICATE-----
+MIIFwjCCA6qgAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwcDELMAkGA1UEBhMCUlUx
+PzA9BgNVBAoMNlRoZSBNaW5pc3RyeSBvZiBEaWdpdGFsIERldmVsb3BtZW50IGFu
+ZCBDb21tdW5pY2F0aW9uczEgMB4GA1UEAwwXUnVzc2lhbiBUcnVzdGVkIFJvb3Qg
+Q0EwHhcNMjIwMzAxMjEwNDE1WhcNMzIwMjI3MjEwNDE1WjBwMQswCQYDVQQGEwJS
+VTE/MD0GA1UECgw2VGhlIE1pbmlzdHJ5IG9mIERpZ2l0YWwgRGV2ZWxvcG1lbnQg
+YW5kIENvbW11bmljYXRpb25zMSAwHgYDVQQDDBdSdXNzaWFuIFRydXN0ZWQgUm9v
+dCBDQTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAMfFOZ8pUAL3+r2n
+qqE0Zp52selXsKGFYoG0GM5bwz1bSFtCt+AZQMhkWQheI3poZAToYJu69pHLKS6Q
+XBiwBC1cvzYmUYKMYZC7jE5YhEU2bSL0mX7NaMxMDmH2/NwuOVRj8OImVa5s1F4U
+zn4Kv3PFlDBjjSjXKVY9kmjUBsXQrIHeaqmUIsPIlNWUnimXS0I0abExqkbdrXbX
+YwCOXhOO2pDUx3ckmJlCMUGacUTnylyQW2VsJIyIGA8V0xzdaeUXg0VZ6ZmNUr5Y
+Ber/EAOLPb8NYpsAhJe2mXjMB/J9HNsoFMBFJ0lLOT/+dQvjbdRZoOT8eqJpWnVD
+U+QL/qEZnz57N88OWM3rabJkRNdU/Z7x5SFIM9FrqtN8xewsiBWBI0K6XFuOBOTD
+4V08o4TzJ8+Ccq5XlCUW2L48pZNCYuBDfBh7FxkB7qDgGDiaftEkZZfApRg2E+M9
+G8wkNKTPLDc4wH0FDTijhgxR3Y4PiS1HL2Zhw7bD3CbslmEGgfnnZojNkJtcLeBH
+BLa52/dSwNU4WWLubaYSiAmA9IUMX1/RpfpxOxd4Ykmhz97oFbUaDJFipIggx5sX
+ePAlkTdWnv+RWBxlJwMQ25oEHmRguNYf4Zr/Rxr9cS93Y+mdXIZaBEE0KS2iLRqa
+OiWBki9IMQU4phqPOBAaG7A+eP8PAgMBAAGjZjBkMB0GA1UdDgQWBBTh0YHlzlpf
+BKrS6badZrHF+qwshzAfBgNVHSMEGDAWgBTh0YHlzlpfBKrS6badZrHF+qwshzAS
+BgNVHRMBAf8ECDAGAQH/AgEEMA4GA1UdDwEB/wQEAwIBhjANBgkqhkiG9w0BAQsF
+AAOCAgEAALIY1wkilt/urfEVM5vKzr6utOeDWCUczmWX/RX4ljpRdgF+5fAIS4vH
+tmXkqpSCOVeWUrJV9QvZn6L227ZwuE15cWi8DCDal3Ue90WgAJJZMfTshN4OI8cq
+W9E4EG9wglbEtMnObHlms8F3CHmrw3k6KmUkWGoa+/ENmcVl68u/cMRl1JbW2bM+
+/3A+SAg2c6iPDlehczKx2oa95QW0SkPPWGuNA/CE8CpyANIhu9XFrj3RQ3EqeRcS
+AQQod1RNuHpfETLU/A2gMmvn/w/sx7TB3W5BPs6rprOA37tutPq9u6FTZOcG1Oqj
+C/B7yTqgI7rbyvox7DEXoX7rIiEqyNNUguTk/u3SZ4VXE2kmxdmSh3TQvybfbnXV
+4JbCZVaqiZraqc7oZMnRoWrXRG3ztbnbes/9qhRGI7PqXqeKJBztxRTEVj8ONs1d
+WN5szTwaPIvhkhO3CO5ErU2rVdUr89wKpNXbBODFKRtgxUT70YpmJ46VVaqdAhOZ
+D9EUUn4YaeLaS8AjSF/h7UkjOibNc4qVDiPP+rkehFWM66PVnP1Msh93tc+taIfC
+EYVMxjh8zNbFuoc7fzvvrFILLe7ifvEIUqSVIC/AzplM/Jxw7buXFeGP1qVCBEHq
+391d/9RAfaZ12zkwFsl+IKwE/OZxW8AHa9i1p4GO0YSNuczzEm4=
+-----END CERTIFICATE-----`),
+  Buffer.from(`-----BEGIN CERTIFICATE-----
+MIIHQjCCBSqgAwIBAgICEAIwDQYJKoZIhvcNAQELBQAwcDELMAkGA1UEBhMCUlUx
+PzA9BgNVBAoMNlRoZSBNaW5pc3RyeSBvZiBEaWdpdGFsIERldmVsb3BtZW50IGFu
+ZCBDb21tdW5pY2F0aW9uczEgMB4GA1UEAwwXUnVzc2lhbiBUcnVzdGVkIFJvb3Qg
+Q0EwHhcNMjIwMzAyMTEyNTE5WhcNMjcwMzA2MTEyNTE5WjBvMQswCQYDVQQGEwJS
+VTE/MD0GA1UECgw2VGhlIE1pbmlzdHJ5IG9mIERpZ2l0YWwgRGV2ZWxvcG1lbnQg
+YW5kIENvbW11bmljYXRpb25zMR8wHQYDVQQDDBZSdXNzaWFuIFRydXN0ZWQgU3Vi
+IENBMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA9YPqBKOk19NFymrE
+wehzrhBEgT2atLezpduB24mQ7CiOa/HVpFCDRZzdxqlh8drku408/tTmWzlNH/br
+HuQhZ/miWKOf35lpKzjyBd6TPM23uAfJvEOQ2/dnKGGJbsUo1/udKSvxQwVHpVv3
+S80OlluKfhWPDEXQpgyFqIzPoxIQTLZ0deirZwMVHarZ5u8HqHetRuAtmO2ZDGQn
+vVOJYAjls+Hiueq7Lj7Oce7CQsTwVZeP+XQx28PAaEZ3y6sQEt6rL06ddpSdoTMp
+BnCqTbxW+eWMyjkIn6t9GBtUV45yB1EkHNnj2Ex4GwCiN9T84QQjKSr+8f0psGrZ
+vPbCbQAwNFJjisLixnjlGPLKa5vOmNwIh/LAyUW5DjpkCx004LPDuqPpFsKXNKpa
+L2Dm6uc0x4Jo5m+gUTVORB6hOSzWnWDj2GWfomLzzyjG81DRGFBpco/O93zecsIN
+3SL2Ysjpq1zdoS01CMYxie//9zWvYwzI25/OZigtnpCIrcd2j1Y6dMUFQAzAtHE+
+qsXflSL8HIS+IJEFIQobLlYhHkoE3avgNx5jlu+OLYe0dF0Ykx1PGNjbwqvTX37R
+Cn32NMjlotW2QcGEZhDKj+3urZizp5xdTPZitA+aEjZM/Ni71VOdiOP0igbw6asZ
+2fxdozZ1TnSSYNYvNATwthNmZysCAwEAAaOCAeUwggHhMBIGA1UdEwEB/wQIMAYB
+Af8CAQAwDgYDVR0PAQH/BAQDAgGGMB0GA1UdDgQWBBTR4XENCy2BTm6KSo9MI7NM
+XqtpCzAfBgNVHSMEGDAWgBTh0YHlzlpfBKrS6badZrHF+qwshzCBxwYIKwYBBQUH
+AQEEgbowgbcwOwYIKwYBBQUHMAKGL2h0dHA6Ly9yb3N0ZWxlY29tLnJ1L2NkcC9y
+b290Y2Ffc3NsX3JzYTIwMjIuY3J0MDsGCCsGAQUFBzAChi9odHRwOi8vY29tcGFu
+eS5ydC5ydS9jZHAvcm9vdGNhX3NzbF9yc2EyMDIyLmNydDA7BggrBgEFBQcwAoYv
+aHR0cDovL3JlZXN0ci1wa2kucnUvY2RwL3Jvb3RjYV9zc2xfcnNhMjAyMi5jcnQw
+gbAGA1UdHwSBqDCBpTA1oDOgMYYvaHR0cDovL3Jvc3RlbGVjb20ucnUvY2RwL3Jv
+b3RjYV9zc2xfcnNhMjAyMi5jcmwwNaAzoDGGL2h0dHA6Ly9jb21wYW55LnJ0LnJ1
+L2NkcC9yb290Y2Ffc3NsX3JzYTIwMjIuY3JsMDWgM6Axhi9odHRwOi8vcmVlc3Ry
+LXBraS5ydS9jZHAvcm9vdGNhX3NzbF9yc2EyMDIyLmNybDANBgkqhkiG9w0BAQsF
+AAOCAgEARBVzZls79AdiSCpar15dA5Hr/rrT4WbrOfzlpI+xrLeRPrUG6eUWIW4v
+Sui1yx3iqGLCjPcKb+HOTwoRMbI6ytP/ndp3TlYua2advYBEhSvjs+4vDZNwXr/D
+anbwIWdurZmViQRBDFebpkvnIvru/RpWud/5r624Wp8voZMRtj/cm6aI9LtvBfT9
+cfzhOaexI/99c14dyiuk1+6QhdwKaCRTc1mdfNQmnfWNRbfWhWBlK3h4GGE9JK33
+Gk8ZS8DMrkdAh0xby4xAQ/mSWAfWrBmfzlOqGyoB1U47WTOeqNbWkkoAP2ys94+s
+Jg4NTkiDVtXRF6nr6fYi0bSOvOFg0IQrMXO2Y8gyg9ARdPJwKtvWX8VPADCYMiWH
+h4n8bZokIrImVKLDQKHY4jCsND2HHdJfnrdL2YJw1qFskNO4cSNmZydw0Wkgjv9k
+F+KxqrDKlB8MZu2Hclph6v/CZ0fQ9YuE8/lsHZ0Qc2HyiSMnvjgK5fDc3TD4fa8F
+E8gMNurM+kV8PT8LNIM+4Zs+LKEV8nqRWBaxkIVJGekkVKO8xDBOG/aN62AZKHOe
+GcyIdu7yNMMRihGVZCYr8rYiJoKiOzDqOkPkLOPdhtVlgnhowzHDxMHND/E2WA5p
+ZHuNM/m0TXt2wTTPL7JH2YC0gPz/BvvSzjksgzU5rLbRyUKQkgU=
+-----END CERTIFICATE-----`)],
+});
 
 interface Post {
   id: number;
@@ -11,58 +97,73 @@ interface Post {
   text: string;
 }
 
-interface GroupState {
+interface VKGroupMonitorGroup {
+  id: number;
   lastCheckedDate: number;
   offset: number;
+  name: string;
+  screen_name: string;
+  is_closed: number;
+  type: string;
+  is_admin: number;
+  is_member: number;
+  is_advertiser: number;
+  photo_50: string;
+  photo_100: string;
+  photo_200: string;
 }
 
-interface StoredPost {
-  groupId: number;
-  original: string;
-  rewritten: string;
-}
-
-interface ProcessedPost {
+interface VKGroupMonitorPost {
   id: number;
   groupId: number;
   original: string;
-  rewritten: string;
+  rewritten: string | null;
 }
 
 interface VKGroupMonitorEvents {
-  newPost: (post: Post) => void;
-  postProcessed: (processedPost: ProcessedPost) => void;
-  postAlreadyProcessed: (storedPost: StoredPost) => void;
-  error: (error: Error) => void;
+  newPost: [post: Post];
+  postProcessed: [processedPost: VKGroupMonitorPost];
+  postAlreadyProcessed: [storedPost: VKGroupMonitorPost];
+  error: [error: Error];
 }
 
-class VKGroupMonitor extends EventEmitter {
-  private vkAccessToken: string | null = null;
-  private gigaChatAccessToken: string | null = null;
+export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
+  private clientId: string = randomUUID();
+
+  private gigaChatApiKey: string;
+  private vkAccessToken: string;
+  private gigachatAccessToken: string | null = null;
 
   private pollInterval: number;
   private postsPerRequest: number;
+  private messages: { role: string; content: string }[];
 
   // LevelDB for posts
-  private postsDb: Level<string, StoredPost>;
+  private postsDb: Level<string, VKGroupMonitorPost>;
 
   // LevelDB for groups state
-  private groupsState: Map<number, GroupState>;
-  private groupsStateDb: Level<string, GroupState>;
+  private groups: Map<number, Pick<VKGroupMonitorGroup, 'id' | 'lastCheckedDate' | 'offset'>>;
+  private groupsDb: Level<string, VKGroupMonitorGroup>;
 
-  constructor() {
-    super(); // Call EventEmitter constructor
-    const groupIds = process.env.GROUP_IDS?.split(",").map(Number) || [];
-    this.vkAccessToken = process.env.VK_ACCESS_TOKEN || "";
-    this.pollInterval = Number(process.env.POLL_INTERVAL) || 60000;
-    this.postsPerRequest = Number(process.env.POSTS_PER_REQUEST) || 10;
+  constructor(config: VKGroupMonitorConfig) {
+    super();
 
-    this.groupsState = new Map(
+    const groupIds = config.groupIds;
+
+    this.vkAccessToken = config.vkAccessToken;
+    this.gigaChatApiKey = config.gigachatApiKey;
+
+    this.pollInterval = config.pollInterval;
+    this.postsPerRequest = config.postsPerRequest;
+    this.messages = config.messages;
+
+    this.groups = new Map(
       groupIds.map((id) => [
         id,
         {
-          lastCheckedDate: 0,
+          id,
           offset: 0,
+          lastCheckedDate: Date.now() / 1000 - 1000 * 60 * 60 * 24,
         },
       ]),
     );
@@ -73,6 +174,18 @@ class VKGroupMonitor extends EventEmitter {
       );
     }
 
+    if (!config.dbDir) {
+      throw new Error(
+        "DB_DIR is not set in the environment variables",
+      );
+    }
+
+    if (!this.gigaChatApiKey) {
+      throw new Error(
+        "GIGACHAT_API_KEY is not set in the environment variables",
+      );
+    }
+
     if (groupIds.length === 0) {
       throw new Error(
         "GROUP_IDS is not set or invalid in the environment variables",
@@ -80,100 +193,174 @@ class VKGroupMonitor extends EventEmitter {
     }
 
     // Initialize LevelDB for posts
-    this.postsDb = new Level<string, StoredPost>("./db/posts", {
+    this.postsDb = new Level<string, VKGroupMonitorPost>(config.dbDir + "/posts", {
       valueEncoding: "json",
     });
 
-    // Initialize LevelDB for state
-    this.groupsStateDb = new Level<string, GroupState>("./db/state", {
+    // Initialize LevelDB for groups
+    this.groupsDb = new Level<string, VKGroupMonitorGroup>(config.dbDir + "/groups", {
       valueEncoding: "json",
     });
   }
 
+
   public async start(): Promise<void> {
-    await this.restoreState();
-    await this.getGigaChatAccessToken();
+    await this.restoreGroups();
+
+    await this.fetchGroups();
+    await this.fetchGigachatAccessToken();
+
     this.pollGroups();
   }
 
-  private async getGigaChatAccessToken(): Promise<string> {
+  public async getPosts(): Promise<VKGroupMonitorPost[]> {
+    try {
+      const posts: VKGroupMonitorPost[] = [];
+      for await (const [key, value] of this.postsDb.iterator()) {
+        posts.push(value);
+      }
+
+      return posts.filter(post => post.rewritten !== null);
+    } catch (error) {
+      console.error("Error getting posts:", error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      return [];
+    }
+  }
+
+  public async getPost(id: string): Promise<VKGroupMonitorPost | null> {
+    try {
+      const post = await this.postsDb.get(id);
+      if (!post) {
+        return null;
+      }
+
+      return post.rewritten ? post : null;
+    } catch (error) {
+      console.error(`Error getting post ${id}:`, error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      return null;
+    }
+  }
+
+  public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
+    try {
+      const state = await this.groupsDb.get('group_' + groupId.toString());
+      if (!state) {
+        console.log(`Group ${groupId} not found`);
+        return null;
+      }
+
+      return state;
+    } catch (error) {
+      console.error(`Error getting group state for group ${groupId}:`, error);
+      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      return null;
+    }
+  }
+
+  public async getGroups(): Promise<VKGroupMonitorGroup[]> {
+    const groups: VKGroupMonitorGroup[] = [];
+    for (const groupId of this.groups.keys()) {
+      const group = await this.groupsDb.get('group_' + groupId.toString());
+      if (group) {
+        groups.push(group);
+      }
+    }
+
+    return groups;
+  }
+
+  private async fetchGigachatAccessToken(): Promise<string | null> {
     try {
       const response = await fetch("https://ngw.devices.sberbank.ru:9443/api/v2/oauth", {
         method: 'POST',
+        agent: httpsAgent,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${this.gigaChatApiKey}`,
           'RqUID': randomUUID(),
-          'Authorization': `Bearer ${process.env.GIGACHAT_API_KEY}`,
         },
         body: new URLSearchParams([
           ['scope', 'GIGACHAT_API_PERS'],
         ]),
       });
 
-      const json = await response.json();
-      this.gigaChatAccessToken = json["access_token"];
+      const json = await response.json() as { access_token: string };
+      this.gigachatAccessToken = json["access_token"];
 
-      return this.gigaChatAccessToken || "";
+      return this.gigachatAccessToken || "";
     } catch (error) {
       console.error("Error getting GigaChat access token:", error);
       this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      return null;
     }
   }
 
-  private async restoreState(): Promise<void> {
-    for (const [groupId, group] of this.groupsState) {
+  private async restoreGroups(): Promise<void> {
+    for (const groupId of this.groups.keys()) {
       try {
-        const state = await this.groupsStateDb.get(`group_${groupId}`);
-        group.lastCheckedDate = state.lastCheckedDate;
-        group.offset = state.offset;
+        const state = await this.groupsDb.get('group_' + groupId.toString());
+        if (!state) {
+          console.log(`Group ${groupId} state not found`);
+          continue;
+        }
+
+        this.groups.set(groupId, {
+          id: groupId,
+          lastCheckedDate: state.lastCheckedDate,
+          offset: state.offset,
+        });
+
         console.log(
           `Restored state for group ${groupId}: last checked at ${new Date(
-            group.lastCheckedDate * 1000,
-          )}, offset: ${group.offset}`,
+            state.lastCheckedDate * 1000,
+          )}, offset: ${state.offset}`,
         );
       } catch (error) {
         if ((error as { code: string }).code !== "LEVEL_NOT_FOUND") {
           console.error(`Error restoring state for group ${groupId}:`, error);
           this.emit("error", error instanceof Error ? error : new Error(String(error)));
-          throw error;
         }
       }
     }
   }
 
-  private async saveState(
-    groupId: number,
-    lastCheckedDate: number,
-    offset: number,
+  private async saveGroup(
+    group: VKGroupMonitorGroup,
   ): Promise<void> {
     try {
-      await this.groupsStateDb.put(`group_${groupId}`, {
-        lastCheckedDate,
-        offset,
+      await this.groupsDb.put('group_' + group.id.toString(), {
+        ...group,
+        lastCheckedDate: group.lastCheckedDate,
+        offset: group.offset,
       });
     } catch (error) {
-      console.error(`Error saving state for group ${groupId}:`, error);
+      console.error(`Error saving state for group ${group.id}:`, error);
       this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
     }
   }
 
   private async pollGroups(): Promise<void> {
-    for (const [groupId, group] of this.groupsState) {
-      await this.checkGroupPosts(groupId, group);
-      await this.saveState(groupId, group.lastCheckedDate, group.offset);
+    for (const groupId of this.groups.keys()) {
+      const group = await this.groupsDb.get('group_' + groupId.toString());
+      if (!group) {
+        console.log(`Group ${groupId} state not found`);
+        continue;
+      }
+
+      await this.fetchGroupPosts(groupId, group);
+      await this.saveGroup(group);
     }
 
     setTimeout(() => this.pollGroups(), this.pollInterval);
   }
 
-  private async checkGroupPosts(
+  private async fetchGroupPosts(
     groupId: number,
-    group: GroupState,
+    group: VKGroupMonitorGroup,
   ): Promise<void> {
     let hasMorePosts = true;
-
     while (hasMorePosts) {
       try {
         const posts = await this.fetchPosts(groupId, group.offset);
@@ -185,7 +372,7 @@ class VKGroupMonitor extends EventEmitter {
 
         for (const post of posts) {
           if (post.date > group.lastCheckedDate) {
-            await this.processNewPost(post, groupId);
+            await this.processPost(post, groupId);
           } else {
             hasMorePosts = false;
             break;
@@ -194,18 +381,63 @@ class VKGroupMonitor extends EventEmitter {
 
         group.lastCheckedDate = Math.max(group.lastCheckedDate, posts[0].date);
         group.offset += this.postsPerRequest; // Update the offset
-        await this.saveState(groupId, group.lastCheckedDate, group.offset);
+        await this.saveGroup(group);
       } catch (error) {
         console.error(`Error fetching posts for group ${groupId}:`, error);
         this.emit("error", error instanceof Error ? error : new Error(String(error)));
         hasMorePosts = false;
-        throw error;
       }
     }
 
     // Reset offset after processing all posts
     group.offset = 0;
-    await this.saveState(groupId, group.lastCheckedDate, group.offset);
+    await this.saveGroup(group);
+  }
+
+  private async fetchGroups(): Promise<void> {
+    const groupIds = Array.from(this.groups.values())
+      .map(group => group.id);
+
+    if (groupIds.length === 0) {
+      return
+    }
+
+    const params = new URLSearchParams([
+      ['group_ids', groupIds.join(',')],
+      ['fields', 'links'],
+      ['access_token', this.vkAccessToken || ''],
+      ['v', '5.131'],
+    ]);
+    const response = await fetch(`https://api.vk.com/method/groups.getById?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'X-Client-Id': this.clientId,
+        'X-Request-Id': randomUUID(),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await response.json() as { response: Omit<VKGroupMonitorGroup, 'lastCheckedDate' | 'offset'>[] };
+    for (const group of json.response) {
+      try {
+        let state: VKGroupMonitorGroup | null = null;
+
+        try {
+          state = await this.groupsDb.get('group_' + group.id.toString());
+        } catch (error) {
+          console.log(`Group ${group.id} state not found`);
+        }
+
+        await this.saveGroup({
+          ...group,
+          lastCheckedDate: state?.lastCheckedDate || 0,
+          offset: state?.offset || 0,
+        });
+      } catch (error) {
+        console.error(`Error saving group ${group.id}:`, error);
+        this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      }
+    }
   }
 
   private async fetchPosts(
@@ -214,7 +446,7 @@ class VKGroupMonitor extends EventEmitter {
   ): Promise<Post[]> {
     try {
       const params = new URLSearchParams([
-        ['owner_id', `-${groupId}`],
+        ['owner_id', '-' + groupId.toString()],
         ['count', this.postsPerRequest.toString()],
         ['offset', offset.toString()],
         ['access_token', this.vkAccessToken || ''],
@@ -222,35 +454,53 @@ class VKGroupMonitor extends EventEmitter {
       ]);
       const response = await fetch(`https://api.vk.com/method/wall.get?${params.toString()}`, {
         method: 'GET',
+        headers: {
+          'X-Client-Id': this.clientId,
+          'X-Request-Id': randomUUID(),
+          'Content-Type': 'application/json',
+        },
       });
 
-      const json = await response.json();
-      return json.response.items;
+      const json = await response.json() as { response: { items: { id: number; date: number; text: string }[] } };
+      return json.response.items
+        .filter((item: any) =>
+          item.text.length > 0 &&
+          item.text.length < 10000
+        )
+        .map((item: any) => ({
+          id: Number(item.id),
+          date: Number(item.date),
+          text: item.text.trim(),
+        }));
     } catch (error) {
       console.error(`Error fetching posts for group ${groupId}:`, error);
       this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      return [];
     }
   }
 
-  private async processNewPost(post: Post, groupId: number): Promise<void> {
+  private async processPost(post: Post, groupId: number): Promise<void> {
     try {
-      const storedPost = await this.getStoredPost(post.id.toString());
+      const storedPost = await this.getPost(post.id.toString());
       if (storedPost) {
         this.emit("postAlreadyProcessed", storedPost);
         return;
       }
 
       this.emit("newPost", post);
+      const rewrittenText = await this.rewritePost(post.text);
 
-      const rewrittenText = await this.rewritePostWithGigaChat(post.text);
-
-      await this.storePost(
-        post.id.toString(),
-        groupId,
-        post.text,
-        rewrittenText,
-      );
+      try {
+        await this.savePost(
+          post.id.toString(),
+          groupId,
+          post.text,
+          rewrittenText,
+        );
+      } catch (error) {
+        console.error(`Error storing post ${post.id} for group ${groupId}:`, error);
+        this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      }
 
       this.emit("postProcessed", {
         id: post.id,
@@ -264,61 +514,61 @@ class VKGroupMonitor extends EventEmitter {
         "error",
         error instanceof Error ? error : new Error(String(error)),
       );
-      throw error;
     }
   }
 
-  private async getStoredPost(postId: string): Promise<StoredPost | undefined> {
-    try {
-      return await this.postsDb.get(postId);
-    } catch (error) {
-      if ((error as { code: string }).code === "LEVEL_NOT_FOUND") {
-        return undefined;
-      }
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
-  }
-
-  private async storePost(
+  private async savePost(
     postId: string,
     groupId: number,
     original: string,
-    rewritten: string,
+    rewritten: string | null,
   ): Promise<void> {
     try {
-      await this.postsDb.put(postId, { groupId, original, rewritten });
+      await this.postsDb.put(postId, { id: Number(postId), groupId, original, rewritten });
     } catch (error) {
       console.error(`Error storing post ${postId} for group ${groupId}:`, error);
       this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
     }
   }
 
-  private async rewritePostWithGigaChat(text: string): Promise<string> {
+  private async getGigaChatTokensCount(text: string): Promise<{ text: string; tokens: number; characters: number }[]> {
+    const result = text.split('\n').filter(line => line.trim().length > 0).map((line, index) => ({ text: line.trim(), index }));
+    const response = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
+      method: 'POST',
+      agent: httpsAgent,
+      headers: {
+        'X-Client-Id': this.clientId,
+        'X-Request-Id': randomUUID(),
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.gigachatAccessToken}`,
+      },
+      body: JSON.stringify({
+        model: "GigaChat",
+        input: result.map(item => item.text),
+      }),
+    });
+
+    const json = await response.json() as { object: string; tokens: number; characters: number }[];
+    return result.map((item, index) => ({ ...item, ...json[index] }));
+  }
+
+  private async rewritePost(text: string): Promise<string | null> {
     try {
       const response = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
         method: 'POST',
+        agent: httpsAgent,
         headers: {
-          'Content-Type': 'application/json',
-          'X-Client-Id': 'b6874da0-bf06-410b-a150-fd5f9164a0b2',
+          'X-Client-Id': this.clientId,
           'X-Request-Id': randomUUID(),
-          'X-Session-Id': randomUUID(),
-          'Authorization': `Bearer ${this.gigaChatAccessToken}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.gigachatAccessToken}`,
         },
         body: JSON.stringify({
           model: "GigaChat",
           stream: false,
           update_interval: 0,
           messages: [
-            {
-              role: "system",
-              content: "Пиши текст в стиле, характерном для юристов, адвокатов, судей и прочих профессий, связанных с законодательством.",
-            },
-            {
-              role: "user",
-              content: 'Перепиши текст новости в юморный стиль.',
-            },
+            ...this.messages,
             {
               role: "user",
               content: text,
@@ -327,43 +577,17 @@ class VKGroupMonitor extends EventEmitter {
         }),
       });
 
-      const json = await response.json();
+      const json = await response.json() as { choices: { message: { content: string } }[] };
       return json.choices[0].message.content;
     } catch (error) {
+      if ((error as { status: number }).status === 403) {
+        await this.fetchGigachatAccessToken();
+        return this.rewritePost(text);
+      }
+
       console.error("Error rewriting post with GigaChat:", error);
       this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      return null;
     }
   }
 }
-
-// Usage example:
-const groupMonitor = new VKGroupMonitor();
-
-// Event listeners with type checking
-groupMonitor.on("newPost", (post: Post) => {
-  console.log("New post detected:", post.text);
-});
-
-groupMonitor.on("postProcessed", (processedPost: ProcessedPost) => {
-  console.log("Post processed:", processedPost.rewritten);
-});
-
-groupMonitor.on("postAlreadyProcessed", (storedPost: StoredPost) => {
-  console.log("Post already processed:", storedPost.groupId);
-});
-
-groupMonitor.on("error", (error: Error) => {
-  console.error("An error occurred:", error);
-});
-
-groupMonitor
-  .start()
-  .catch((error) => console.error("Error starting VKGroupMonitor:", error));
-
-// Graceful shutdown handler
-process.on("SIGINT", async () => {
-  console.log("Gracefully shutting down...");
-  // Perform any cleanup or final state saving here if needed
-  process.exit(0);
-});
