@@ -33,7 +33,12 @@
 
         copied.classList.remove("opacity-0");
         copied.classList.add("opacity-100");
-        navigator.clipboard.writeText(text);
+        
+        try { 
+          navigator.clipboard.writeText(text);
+        } catch (err) {
+          console.error("Failed to copy: ", err);
+        }
 
         setTimeout(() => {
           copied.classList.remove("opacity-100");
