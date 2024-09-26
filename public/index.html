@@ -6,17 +6,17 @@
     <title>VK Group Monitor Posts</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    <h1>VK Group Monitor Posts</h1>
-    <div id="posts"></div>
+  <body class="bg-gray-100 font-sans p-5">
+    <h1 class="text-center text-2xl font-bold text-gray-800 mb-6 drop-shadow-md">VK Group Monitor</h1>
+    <div id="posts" class="max-w-3xl mx-auto"></div>
 
     <script>
       async function fetchPosts() {
-        const postsResponse = await fetch("/api/post");
+        const postsResponse = await fetch("/api/posts");
         const posts = await postsResponse.json();
         const postsDiv = document.getElementById("posts");
 
-        const groupStatesResponse = await fetch("/api/group");
+        const groupStatesResponse = await fetch("/api/groups");
         const groups = await groupStatesResponse.json();
 
         function getGroupState(groupId) {
@@ -26,91 +26,36 @@
         if (posts.success) {
           posts.data.forEach((post) => {
             const postDiv = document.createElement("div");
-            postDiv.innerHTML = `<h2><b>Группа:</b> ${
-              groups.success ? getGroupState(post.groupId).name : post.groupId
-            }</h2>
-              <img src="${
-                groups.success ? getGroupState(post.groupId).photo_50 : ""
-              }">
-              <p><b>Оригинал:</b> <br> ${post.original}</p>
-              <p><b>Переписанный текст:</b> <br> ${post.rewritten}</p>`;
+            postDiv.className = "bg-white border border-gray-300 rounded-lg mb-4 shadow relative";
+            postDiv.innerHTML = `
+              <h2 class="text-blue-600 mb-2 py-2 px-4 relative z-10 w-full border-b border-gray-300 flex items-center justify-between">
+                <div class="flex flex-row items-center">
+                  <img
+                    src="${groups.success ? getGroupState(post.groupId).photo_50 : ""}"
+                    class="relative h-10 inline-flex py-2 mr-2 rounded-full"
+                  />
+                  <span class="text-lg font-bold">${groups.success ? getGroupState(post.groupId).name : post.groupId}</span>
+                </div>
+                <div class="ml-2 px-2 py-1 rounded-full float-right text-xs text-gray-500 bg-white bg-opacity-80">
+                  ${new Date(post.date * 1000).toLocaleString()}
+                </div>
+              </h2>
+              <p class="mb-2 bg-white bg-opacity-80 text-gray-700 py-1 px-4 rounded-md leading-tight">
+                ${post.rewritten}
+              </p>
+              <p class="mt-4 py-4 border-t border-dashed border-gray-300 italic text-xs text-gray-500 bg-white bg-opacity-80 py-1 px-4 rounded-md">
+                <b class="text-gray-700">Оригинал:</b>
+                ${post.original}
+              </p>`;
 
-            postDiv.classList.add("post");
             postsDiv.appendChild(postDiv);
           });
         } else {
-          postsDiv.innerHTML = `<p class="error">Error fetching posts: ${posts.error}</p>`;
+          postsDiv.innerHTML = `<p class="text-red-600 text-center">Error fetching posts: ${posts.error}</p>`;
         }
       }
 
       fetchPosts();
     </script>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background-color: #f9f9f9;
-        margin: 0;
-        padding: 20px;
-      }
-      h1 {
-        text-align: center;
-        color: #333;
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 20px;
-        text-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-      }
-      #posts {
-        max-width: 800px;
-        margin: 0 auto;
-      }
-      .post {
-        background-color: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 10px 0;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        position: relative;
-      }
-      .post h2 {
-        color: #007bff;
-        margin: 0 0 10px;
-        z-index: 1;
-        position: relative;
-      }
-      .post p {
-        margin: 5px 0;
-        color: #555;
-        z-index: 1;
-        position: relative;
-        background-color: rgba(255, 255, 255, 0.8);
-      }
-      .post p + p {
-        margin-top: 10px;
-        font-style: italic;
-        border-top: 1px dashed #ddd;
-        padding-top: 10px;
-        z-index: 1;
-        position: relative;
-      }
-      .post img {
-        width: 100%;
-        height: auto;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 50px;
-        z-index: 0;
-      }
-      .error {
-        color: red;
-        text-align: center;
-        z-index: 1;
-        position: relative;
-      }
-    </style>
   </body>
 </html>

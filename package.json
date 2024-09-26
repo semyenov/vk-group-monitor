@@ -17,7 +17,12 @@
   },
   "scripts": {
     "build": "pkgroll",
-    "start": "node ./dist/cli.js"
+    "start": "node ./dist/cli.js",
+    "dev": "tsx watch ./src/index.ts",
+    "docker:build": "docker build -t vk-group-monitor .",
+    "docker:run": "docker run -p 3000:3000 vk-group-monitor",
+    "docker:dev": "docker run -p 3000:3000 -v $(pwd)/db:/app/db -v $(pwd)/config.yaml:/app/config.yaml vk-group-monitor",
+    "docker:push": "docker push ghcr.io/semyenov/vk-group-monitor:latest"
   },
   "devDependencies": {
     "pkgroll": "^2.5.0",
@@ -27,17 +32,12 @@
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.7.2",
-    "crypto": "^1.0.1",
-    "events": "^3.3.0",
-    "fs": "^0.0.1-security",
     "h3": "^1.12.0",
     "h3-basic-auth": "^0.0.1",
     "js-yaml": "^4.1.0",
     "level": "^8.0.1",
     "listhen": "^1.8.0",
-    "node-fetch": "^3.3.2",
-    "path": "^0.12.7",
-    "process": "^0.11.10"
+    "node-fetch": "^3.3.2"
   },
   "packageManager": "yarn@4.5.0"
 }

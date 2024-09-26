@@ -2,13 +2,20 @@
 import yaml from "js-yaml";
 import fs from "fs";
 import { VKGroupMonitor, VKGroupMonitorConfig } from "./index";
-import { createApp, defineEventHandler, getRouterParam, createRouter, toNodeListener } from 'h3';
-import { listen } from 'listhen';
-import { createBasicAuthMiddleware } from 'h3-basic-auth';
+import {
+  createApp,
+  createRouter,
+  defineEventHandler,
+  getRouterParam,
+  serveStatic,
+  toNodeListener,
+} from "h3";
+import { listen } from "listhen";
+import { createBasicAuthMiddleware } from "h3-basic-auth";
 
 // Get config file path from command line arguments
 const args = process.argv.slice(2);
-const configFilePath = args[0] || './config.yaml';
+const configFilePath = args[0] || "./config.yaml";
 
 const config: VKGroupMonitorConfig = {
   vkAccessToken: process.env.VK_ACCESS_TOKEN || "",
@@ -17,14 +24,27 @@ const config: VKGroupMonitorConfig = {
   postsPerRequest: Number(process.env.POSTS_PER_REQUEST) || 10,
   gigachatApiKey: process.env.GIGACHAT_API_KEY || "",
   dbDir: process.env.DB_DIR || "./db",
-  messages: [],
-}
+  auth: {
+    username: process.env.AUTH_USERNAME || "admin",
+    password: process.env.AUTH_PASSWORD || "password",
+    sessionSecret: process.env.AUTH_SESSION_SECRET || "secret",
+  },
+  messages: [
+    {
+      role: "system",
+      content: "You are a helpful assistant.",
+    },
+    {
+      role: "user",
+      content: "Rewrite the following text in a more concise and engaging way.",
+    },
+  ],
+};
 
-// Load environment variables from YAML file
-const loadEnvFromYAML = (filePath: string) => {
+const loadConfig = (filePath: string) => {
   try {
-    const fileContents = fs.readFileSync(filePath, 'utf8');
-    const data = yaml.load(fileContents) as Record<string, string>;
+    const fileContents = fs.readFileSync(filePath, "utf8");
+    const data = yaml.load(fileContents) as Record<string, any>;
     for (const [key, value] of Object.entries(data)) {
       if (key in config) {
         config[key] = value;
@@ -34,12 +54,12 @@ const loadEnvFromYAML = (filePath: string) => {
     console.error("Ошибка при загрузке конфигурации:", e);
     throw e;
   }
-}
+};
 
-loadEnvFromYAML(configFilePath);
-const groupMonitor = new VKGroupMonitor(config);
+loadConfig(configFilePath);
+const monitor = new VKGroupMonitor(config);
 
-groupMonitor.on("postProcessed", (processedPost) => {
+monitor.on("postProcessed", (processedPost) => {
   console.log("\n---");
   console.log("Группа:", processedPost.groupId);
   console.log("Номер поста:", processedPost.id);
@@ -48,63 +68,74 @@ groupMonitor.on("postProcessed", (processedPost) => {
   console.log(processedPost.rewritten);
 });
 
-groupMonitor.on("error", (error: Error) => {
+monitor.on("error", (error: Error) => {
   console.error("Произошла ошибка:", error);
 });
 
-groupMonitor
+monitor
   .start()
   .catch((error) => console.error("Ошибка при запуске VKGroupMonitor:", error));
 
-const router = createRouter()
+const app = createApp();
+const router = createRouter();
 
-router.get('/', defineEventHandler(async (event) => {
-  return fs.readFileSync('./public/index.html', 'utf8');
-}))
+router.use(
+  "/",
+  defineEventHandler(async (event) => {
+    return fs.readFileSync("./public/index.html", "utf8");
+  }),
+);
 
-router.get('/api/post', defineEventHandler(async (event) => {
-  const posts = await groupMonitor.getPosts();
-  return { success: true, data: posts }
-}))
+router.get(
+  "/api/posts",
+  defineEventHandler(async (event) => {
+    const posts = await monitor.getPosts();
+    return { success: true, data: posts };
+  }),
+);
 
-router.get('/api/post/:id', defineEventHandler(async (event) => {
-  const postId = getRouterParam(event, 'id');
-  if (!postId) {
-    return { success: false, error: "Post ID is required" }
-  }
+router.get(
+  "/api/posts/:id",
+  defineEventHandler(async (event) => {
+    const postId = getRouterParam(event, "id");
+    if (!postId) {
+      return { success: false, error: "Post ID is required" };
+    }
 
-  const post = await groupMonitor.getPost(postId);
-  if (!post) {
-    return { success: false, error: "Post not found" }
-  }
+    const post = await monitor.getPost(Number(postId));
+    if (!post) {
+      return { success: false, error: "Post not found" };
+    }
 
-  return { success: true, data: post }
-}))
+    return { success: true, data: post };
+  }),
+);
 
-router.get('/api/group', defineEventHandler(async (event) => {
-  const groups = await groupMonitor.getGroups();
-  return { success: true, data: groups }
-}))
+router.get(
+  "/api/groups",
+  defineEventHandler(async (event) => {
+    const groups = await monitor.getGroups();
+    return { success: true, data: groups };
+  }),
+);
 
-router.get('/api/group/:id', defineEventHandler(async (event) => {
-  const groupId = getRouterParam(event, 'id');
-  if (!groupId) {
-    return { success: false, error: "Group ID is required" }
-  }
+router.get(
+  "/api/groups/:id",
+  defineEventHandler(async (event) => {
+    const groupId = getRouterParam(event, "id");
+    if (!groupId) {
+      return { success: false, error: "Group ID is required" };
+    }
 
-  const group = await groupMonitor.getGroup(Number(groupId));
-  return { success: true, data: group }
-}))
+    const group = await monitor.getGroup(Number(groupId));
+    return { success: true, data: group };
+  }),
+);
 
-const app = createApp()
+app.use(router);
 
-app.use(createBasicAuthMiddleware({
-  username: 'admin',
-  password: 'password',
-  sessionSecret: 'secret',
-}));
-
-app.use(router)
+const basicAuth = createBasicAuthMiddleware(config.auth);
+app.use(basicAuth);
 
 listen(toNodeListener(app), {
   port: 3000,
@@ -113,4 +144,4 @@ listen(toNodeListener(app), {
 process.on("SIGINT", async () => {
   console.log("Завершение работы...");
   process.exit(0);
-})
+});

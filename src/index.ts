@@ -6,16 +6,28 @@ import fetch from "node-fetch";
 
 export interface VKGroupMonitorConfig extends Record<string, unknown> {
   vkAccessToken: string;
-  groupIds: number[];
+  gigachatApiKey: string;
+
+  dbDir: string;
   pollInterval: number;
   postsPerRequest: number;
-  gigachatApiKey: string;
-  dbDir: string;
-  messages: { role: string; content: string }[];
+
+  auth: {
+    username: string;
+    password: string;
+    sessionSecret: string;
+  };
+
+  groupIds: number[];
+  messages: {
+    role: string;
+    content: string;
+  }[];
 }
 
 const httpsAgent = new https.Agent({
-  ca: [Buffer.from(`-----BEGIN CERTIFICATE-----
+  ca: [
+    Buffer.from(`-----BEGIN CERTIFICATE-----
 MIIFwjCCA6qgAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwcDELMAkGA1UEBhMCUlUx
 PzA9BgNVBAoMNlRoZSBNaW5pc3RyeSBvZiBEaWdpdGFsIERldmVsb3BtZW50IGFu
 ZCBDb21tdW5pY2F0aW9uczEgMB4GA1UEAwwXUnVzc2lhbiBUcnVzdGVkIFJvb3Qg
@@ -48,7 +60,7 @@ D9EUUn4YaeLaS8AjSF/h7UkjOibNc4qVDiPP+rkehFWM66PVnP1Msh93tc+taIfC
 EYVMxjh8zNbFuoc7fzvvrFILLe7ifvEIUqSVIC/AzplM/Jxw7buXFeGP1qVCBEHq
 391d/9RAfaZ12zkwFsl+IKwE/OZxW8AHa9i1p4GO0YSNuczzEm4=
 -----END CERTIFICATE-----`),
-  Buffer.from(`-----BEGIN CERTIFICATE-----
+    Buffer.from(`-----BEGIN CERTIFICATE-----
 MIIHQjCCBSqgAwIBAgICEAIwDQYJKoZIhvcNAQELBQAwcDELMAkGA1UEBhMCUlUx
 PzA9BgNVBAoMNlRoZSBNaW5pc3RyeSBvZiBEaWdpdGFsIERldmVsb3BtZW50IGFu
 ZCBDb21tdW5pY2F0aW9uczEgMB4GA1UEAwwXUnVzc2lhbiBUcnVzdGVkIFJvb3Qg
@@ -88,7 +100,8 @@ F+KxqrDKlB8MZu2Hclph6v/CZ0fQ9YuE8/lsHZ0Qc2HyiSMnvjgK5fDc3TD4fa8F
 E8gMNurM+kV8PT8LNIM+4Zs+LKEV8nqRWBaxkIVJGekkVKO8xDBOG/aN62AZKHOe
 GcyIdu7yNMMRihGVZCYr8rYiJoKiOzDqOkPkLOPdhtVlgnhowzHDxMHND/E2WA5p
 ZHuNM/m0TXt2wTTPL7JH2YC0gPz/BvvSzjksgzU5rLbRyUKQkgU=
------END CERTIFICATE-----`)],
+-----END CERTIFICATE-----`),
+  ],
 });
 
 interface Post {
@@ -97,7 +110,7 @@ interface Post {
   text: string;
 }
 
-interface VKGroupMonitorGroup {
+interface Group {
   id: number;
   lastCheckedDate: number;
   offset: number;
@@ -115,6 +128,7 @@ interface VKGroupMonitorGroup {
 
 interface VKGroupMonitorPost {
   id: number;
+  date: number;
   groupId: number;
   original: string;
   rewritten: string | null;
@@ -129,24 +143,51 @@ interface VKGroupMonitorEvents {
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private clientId: string = randomUUID();
+  private state: Map<number, Pick<Group, "lastCheckedDate" | "offset">>;
 
+  // API keys
   private gigaChatApiKey: string;
   private vkAccessToken: string;
   private gigachatAccessToken: string | null = null;
 
+  // Config
   private pollInterval: number;
   private postsPerRequest: number;
   private messages: { role: string; content: string }[];
 
-  // LevelDB for posts
-  private postsDb: Level<string, VKGroupMonitorPost>;
+  // Timeout for polling groups
+  private poolTimeout: NodeJS.Timeout | null = null;
 
-  // LevelDB for groups state
-  private groups: Map<number, Pick<VKGroupMonitorGroup, 'id' | 'lastCheckedDate' | 'offset'>>;
-  private groupsDb: Level<string, VKGroupMonitorGroup>;
+  // LevelDB
+  private postsDb: Level<string, VKGroupMonitorPost>;
+  private groupsDb: Level<string, Group>;
 
   constructor(config: VKGroupMonitorConfig) {
     super();
+
+    if (!config.dbDir) {
+      throw new Error(
+        "DB_DIR is not set in the environment variables",
+      );
+    }
+
+    if (!config.vkAccessToken) {
+      throw new Error(
+        "VK_ACCESS_TOKEN is not set in the environment variables",
+      );
+    }
+
+    if (!config.gigachatApiKey) {
+      throw new Error(
+        "GIGACHAT_API_KEY is not set in the environment variables",
+      );
+    }
+
+    if (config.groupIds.length === 0) {
+      throw new Error(
+        "GROUP_IDS is not set or invalid in the environment variables",
+      );
+    }
 
     const groupIds = config.groupIds;
 
@@ -157,7 +198,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     this.postsPerRequest = config.postsPerRequest;
     this.messages = config.messages;
 
-    this.groups = new Map(
+    // Set initial state
+    this.state = new Map(
       groupIds.map((id) => [
         id,
         {
@@ -168,425 +210,535 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       ]),
     );
 
-    if (!this.vkAccessToken) {
-      throw new Error(
-        "VK_ACCESS_TOKEN is not set in the environment variables",
-      );
-    }
+    // Initialize LevelDB
+    this.postsDb = new Level<string, VKGroupMonitorPost>(
+      config.dbDir + "/posts",
+      { valueEncoding: "json" },
+    );
 
-    if (!config.dbDir) {
-      throw new Error(
-        "DB_DIR is not set in the environment variables",
-      );
-    }
-
-    if (!this.gigaChatApiKey) {
-      throw new Error(
-        "GIGACHAT_API_KEY is not set in the environment variables",
-      );
-    }
-
-    if (groupIds.length === 0) {
-      throw new Error(
-        "GROUP_IDS is not set or invalid in the environment variables",
-      );
-    }
-
-    // Initialize LevelDB for posts
-    this.postsDb = new Level<string, VKGroupMonitorPost>(config.dbDir + "/posts", {
-      valueEncoding: "json",
-    });
-
-    // Initialize LevelDB for groups
-    this.groupsDb = new Level<string, VKGroupMonitorGroup>(config.dbDir + "/groups", {
-      valueEncoding: "json",
-    });
+    this.groupsDb = new Level<string, Group>(
+      config.dbDir + "/groups",
+      { valueEncoding: "json" },
+    );
   }
 
-
   public async start(): Promise<void> {
-    await this.restoreGroups();
+    await this.updateGroups();
+    await this.updateGigachatAccessToken();
 
-    await this.fetchGroups();
-    await this.fetchGigachatAccessToken();
+    this.poolTimeout = setTimeout(
+      () => this.poll(),
+      this.pollInterval,
+    );
+  }
 
-    this.pollGroups();
+  public async stop(): Promise<void> {
+    if (this.poolTimeout) {
+      clearTimeout(this.poolTimeout);
+    }
   }
 
   public async getPosts(): Promise<VKGroupMonitorPost[]> {
-    try {
-      const posts: VKGroupMonitorPost[] = [];
-      for await (const [key, value] of this.postsDb.iterator()) {
-        posts.push(value);
+    const posts: VKGroupMonitorPost[] = [];
+    for await (const key of this.postsDb.keys()) {
+      const post = await this.postsDb.get(key);
+      if (post) {
+        posts.push(post);
       }
-
-      return posts.filter(post => post.rewritten !== null);
-    } catch (error) {
-      console.error("Error getting posts:", error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      return [];
     }
+
+    return posts
+      .sort((a, b) => b.date - a.date);
   }
 
-  public async getPost(id: string): Promise<VKGroupMonitorPost | null> {
+  public async getPost(postId: number): Promise<VKGroupMonitorPost | null> {
     try {
-      const post = await this.postsDb.get(id);
+      const post = await this.postsDb.get(postId.toString());
       if (!post) {
         return null;
       }
 
-      return post.rewritten ? post : null;
+      return post;
     } catch (error) {
-      console.error(`Error getting post ${id}:`, error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message = `Error getting post ${postId}: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
       return null;
     }
   }
 
-  public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
+  public async getGroup(groupId: number): Promise<Group | null> {
     try {
-      const state = await this.groupsDb.get('group_' + groupId.toString());
+      const state = await this.groupsDb.get(groupId.toString());
       if (!state) {
-        console.log(`Group ${groupId} not found`);
         return null;
       }
 
       return state;
     } catch (error) {
-      console.error(`Error getting group state for group ${groupId}:`, error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message = `Error getting group ${groupId}: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
       return null;
     }
   }
 
-  public async getGroups(): Promise<VKGroupMonitorGroup[]> {
-    const groups: VKGroupMonitorGroup[] = [];
-    for (const groupId of this.groups.keys()) {
-      const group = await this.groupsDb.get('group_' + groupId.toString());
+  public async getGroups(): Promise<Group[]> {
+    const groups: Group[] = [];
+    for (const groupId of this.state.keys()) {
+      const group = await this.getGroup(groupId);
       if (group) {
         groups.push(group);
       }
     }
 
-    return groups;
+    return groups
+      .sort((a, b) => b.lastCheckedDate - a.lastCheckedDate);
   }
 
-  private async fetchGigachatAccessToken(): Promise<string | null> {
+  private async updateGigachatAccessToken(): Promise<string | null> {
     try {
-      const response = await fetch("https://ngw.devices.sberbank.ru:9443/api/v2/oauth", {
-        method: 'POST',
-        agent: httpsAgent,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Bearer ${this.gigaChatApiKey}`,
-          'RqUID': randomUUID(),
+      const response = await fetch(
+        "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+        {
+          method: "POST",
+          agent: httpsAgent,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Bearer ${this.gigaChatApiKey}`,
+            "RqUID": randomUUID(),
+          },
+          body: new URLSearchParams([
+            ["scope", "GIGACHAT_API_PERS"],
+          ]),
         },
-        body: new URLSearchParams([
-          ['scope', 'GIGACHAT_API_PERS'],
-        ]),
-      });
+      );
 
       const json = await response.json() as { access_token: string };
       this.gigachatAccessToken = json["access_token"];
 
-      return this.gigachatAccessToken || "";
+      return this.gigachatAccessToken;
     } catch (error) {
-      console.error("Error getting GigaChat access token:", error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message = `Error getting GigaChat access token: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
       return null;
     }
   }
 
-  private async restoreGroups(): Promise<void> {
-    for (const groupId of this.groups.keys()) {
-      try {
-        const state = await this.groupsDb.get('group_' + groupId.toString());
-        if (!state) {
-          console.log(`Group ${groupId} state not found`);
-          continue;
-        }
-
-        this.groups.set(groupId, {
-          id: groupId,
-          lastCheckedDate: state.lastCheckedDate,
-          offset: state.offset,
-        });
-
-        console.log(
-          `Restored state for group ${groupId}: last checked at ${new Date(
-            state.lastCheckedDate * 1000,
-          )}, offset: ${state.offset}`,
-        );
-      } catch (error) {
-        if ((error as { code: string }).code !== "LEVEL_NOT_FOUND") {
-          console.error(`Error restoring state for group ${groupId}:`, error);
-          this.emit("error", error instanceof Error ? error : new Error(String(error)));
-        }
-      }
-    }
-  }
-
-  private async saveGroup(
-    group: VKGroupMonitorGroup,
+  private async putGroup(
+    group: Group,
   ): Promise<void> {
     try {
-      await this.groupsDb.put('group_' + group.id.toString(), {
-        ...group,
-        lastCheckedDate: group.lastCheckedDate,
-        offset: group.offset,
-      });
+      await this.groupsDb.put(group.id.toString(), group);
     } catch (error) {
-      console.error(`Error saving state for group ${group.id}:`, error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message =
+          `Error saving state for group ${group.id}: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
     }
   }
 
-  private async pollGroups(): Promise<void> {
-    for (const groupId of this.groups.keys()) {
-      const group = await this.groupsDb.get('group_' + groupId.toString());
-      if (!group) {
-        console.log(`Group ${groupId} state not found`);
-        continue;
+  private async poll(): Promise<void> {
+    for (const groupId of this.state.keys()) {
+      const group = await this.getGroup(groupId);
+      if (group) {
+        await this.fetchGroupPosts(group);
       }
-
-      await this.fetchGroupPosts(groupId, group);
-      await this.saveGroup(group);
     }
 
-    setTimeout(() => this.pollGroups(), this.pollInterval);
+    this.poolTimeout = setTimeout(
+      () => this.poll(),
+      this.pollInterval,
+    );
   }
 
   private async fetchGroupPosts(
-    groupId: number,
-    group: VKGroupMonitorGroup,
+    group: Group,
   ): Promise<void> {
     let hasMorePosts = true;
-    while (hasMorePosts) {
-      try {
-        const posts = await this.fetchPosts(groupId, group.offset);
 
-        if (posts.length === 0) {
+    while (hasMorePosts) {
+      const posts = await this.fetchPosts(
+        group.id,
+        group.offset,
+        this.postsPerRequest,
+      );
+      if (posts.length === 0) {
+        hasMorePosts = false;
+        break;
+      }
+
+      for (const post of posts) {
+        if (post.date > group.lastCheckedDate) {
+          await this.processPost(post, group.id);
+        } else {
           hasMorePosts = false;
           break;
         }
-
-        for (const post of posts) {
-          if (post.date > group.lastCheckedDate) {
-            await this.processPost(post, groupId);
-          } else {
-            hasMorePosts = false;
-            break;
-          }
-        }
-
-        group.lastCheckedDate = Math.max(group.lastCheckedDate, posts[0].date);
-        group.offset += this.postsPerRequest; // Update the offset
-        await this.saveGroup(group);
-      } catch (error) {
-        console.error(`Error fetching posts for group ${groupId}:`, error);
-        this.emit("error", error instanceof Error ? error : new Error(String(error)));
-        hasMorePosts = false;
       }
+
+      await this.putGroup({
+        ...group,
+        offset: group.offset + posts.length,
+        lastCheckedDate: Math.max(
+          group.lastCheckedDate,
+          posts[0]?.date || 0,
+        ),
+      });
     }
 
     // Reset offset after processing all posts
-    group.offset = 0;
-    await this.saveGroup(group);
+    await this.putGroup({
+      ...group,
+      offset: 0,
+    });
   }
 
-  private async fetchGroups(): Promise<void> {
-    const groupIds = Array.from(this.groups.values())
-      .map(group => group.id);
+  private async updateGroups(): Promise<void> {
+    const groupIds: number[] = [];
 
-    if (groupIds.length === 0) {
-      return
+    for (const groupId of this.state.keys()) {
+      const group = await this.getGroup(groupId);
+      if (group) {
+        // restore group state
+        this.state.set(
+          groupId,
+          {
+            offset: group.offset,
+            lastCheckedDate: group.lastCheckedDate,
+          },
+        );
+
+        continue;
+      }
+
+      groupIds.push(groupId);
     }
 
+    // fetch groups
     const params = new URLSearchParams([
-      ['group_ids', groupIds.join(',')],
-      ['fields', 'links'],
-      ['access_token', this.vkAccessToken || ''],
-      ['v', '5.131'],
+      ["group_ids", groupIds.join(",")],
+      ["fields", "links"],
+      ["access_token", this.vkAccessToken],
+      ["v", "5.131"],
     ]);
-    const response = await fetch(`https://api.vk.com/method/groups.getById?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'X-Client-Id': this.clientId,
-        'X-Request-Id': randomUUID(),
-        'Content-Type': 'application/json',
-      },
-    });
 
-    const json = await response.json() as { response: Omit<VKGroupMonitorGroup, 'lastCheckedDate' | 'offset'>[] };
-    for (const group of json.response) {
-      try {
-        let state: VKGroupMonitorGroup | null = null;
+    try {
+      const response = await fetch(
+        `https://api.vk.com/method/groups.getById?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "X-Client-Id": this.clientId,
+            "X-Request-Id": randomUUID(),
+            "Content-Type": "application/json",
+          },
+        },
+      );
 
-        try {
-          state = await this.groupsDb.get('group_' + group.id.toString());
-        } catch (error) {
-          console.log(`Group ${group.id} state not found`);
-        }
+      const json = await response.json() as {
+        response: Omit<Group, "lastCheckedDate" | "offset">[];
+      };
 
-        await this.saveGroup({
-          ...group,
-          lastCheckedDate: state?.lastCheckedDate || 0,
-          offset: state?.offset || 0,
+      for (const data of json.response) {
+        const group = await this.getGroup(data.id);
+        await this.putGroup({
+          ...data,
+          lastCheckedDate: group?.lastCheckedDate ||
+            Date.now() / 1000 - 1000 * 60 * 60 * 24,
+          offset: group?.offset || 0,
         });
-      } catch (error) {
-        console.error(`Error saving group ${group.id}:`, error);
-        this.emit("error", error instanceof Error ? error : new Error(String(error)));
       }
+    } catch (error) {
+      if (error instanceof Error) {
+        const message = `Error fetching groups: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
+      return;
     }
   }
 
   private async fetchPosts(
     groupId: number,
     offset: number,
+    count: number,
   ): Promise<Post[]> {
-    try {
-      const params = new URLSearchParams([
-        ['owner_id', '-' + groupId.toString()],
-        ['count', this.postsPerRequest.toString()],
-        ['offset', offset.toString()],
-        ['access_token', this.vkAccessToken || ''],
-        ['v', '5.131'],
-      ]);
-      const response = await fetch(`https://api.vk.com/method/wall.get?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'X-Client-Id': this.clientId,
-          'X-Request-Id': randomUUID(),
-          'Content-Type': 'application/json',
-        },
-      });
+    const posts: Post[] = [];
+    const params = new URLSearchParams([
+      ["owner_id", "-" + groupId.toString()],
+      ["count", count.toString()],
+      ["offset", offset.toString()],
+      ["access_token", this.vkAccessToken || ""],
+      ["v", "5.131"],
+    ]);
 
-      const json = await response.json() as { response: { items: { id: number; date: number; text: string }[] } };
-      return json.response.items
-        .filter((item: any) =>
-          item.text.length > 0 &&
-          item.text.length < 10000
-        )
-        .map((item: any) => ({
-          id: Number(item.id),
-          date: Number(item.date),
-          text: item.text.trim(),
-        }));
+    try {
+      const response = await fetch(
+        `https://api.vk.com/method/wall.get?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "X-Client-Id": this.clientId,
+            "X-Request-Id": randomUUID(),
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const json = await response.json() as {
+        response: { items: Post[] };
+      };
+
+      for (const post of json.response.items) {
+        if (post.text.length > 0 && post.text.length < 10000) {
+          posts.push({
+            id: Number(post.id),
+            date: Number(post.date),
+            text: post.text.trim(),
+          });
+        }
+      }
+
+      return posts;
     } catch (error) {
-      console.error(`Error fetching posts for group ${groupId}:`, error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message =
+          `Error fetching posts for group ${groupId}: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
       return [];
     }
   }
 
-  private async processPost(post: Post, groupId: number): Promise<void> {
-    try {
-      const storedPost = await this.getPost(post.id.toString());
-      if (storedPost) {
-        this.emit("postAlreadyProcessed", storedPost);
-        return;
-      }
-
-      this.emit("newPost", post);
-      const rewrittenText = await this.rewritePost(post.text);
-
-      try {
-        await this.savePost(
-          post.id.toString(),
-          groupId,
-          post.text,
-          rewrittenText,
-        );
-      } catch (error) {
-        console.error(`Error storing post ${post.id} for group ${groupId}:`, error);
-        this.emit("error", error instanceof Error ? error : new Error(String(error)));
-      }
-
-      this.emit("postProcessed", {
-        id: post.id,
-        groupId,
-        original: post.text,
-        rewritten: rewrittenText,
-      });
-    } catch (error) {
-      console.error(`Error processing post ${post.id} for group ${groupId}:`, error);
-      this.emit(
-        "error",
-        error instanceof Error ? error : new Error(String(error)),
-      );
-    }
-  }
-
-  private async savePost(
-    postId: string,
+  private async processPost(
+    { id, text, date }: Post,
     groupId: number,
-    original: string,
-    rewritten: string | null,
   ): Promise<void> {
-    try {
-      await this.postsDb.put(postId, { id: Number(postId), groupId, original, rewritten });
-    } catch (error) {
-      console.error(`Error storing post ${postId} for group ${groupId}:`, error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+    const storedPost = await this.getPost(id);
+    if (storedPost && storedPost.rewritten !== null) {
+      this.emit("postAlreadyProcessed", storedPost);
+      return;
     }
-  }
 
-  private async getGigaChatTokensCount(text: string): Promise<{ text: string; tokens: number; characters: number }[]> {
-    const result = text.split('\n').filter(line => line.trim().length > 0).map((line, index) => ({ text: line.trim(), index }));
-    const response = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
-      method: 'POST',
-      agent: httpsAgent,
-      headers: {
-        'X-Client-Id': this.clientId,
-        'X-Request-Id': randomUUID(),
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.gigachatAccessToken}`,
-      },
-      body: JSON.stringify({
-        model: "GigaChat",
-        input: result.map(item => item.text),
-      }),
+    this.emit("newPost", {
+      id,
+      text,
+      date,
     });
 
-    const json = await response.json() as { object: string; tokens: number; characters: number }[];
-    return result.map((item, index) => ({ ...item, ...json[index] }));
+    const rewritten = await this.rewritePost(text);
+    const post: VKGroupMonitorPost = {
+      id,
+      date,
+      groupId,
+      original: text,
+      rewritten,
+    };
+
+    await this.putPost(post);
+    this.emit("postProcessed", post);
+  }
+
+  private async putPost(
+    post: VKGroupMonitorPost,
+  ): Promise<void> {
+    try {
+      await this.postsDb.put(post.id.toString(), post);
+    } catch (error) {
+      if (error instanceof Error) {
+        const message =
+          `Error storing post ${post.id} for group ${post.groupId}: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
+      return;
+    }
+  }
+
+  private async getGigaChatTokensCount(
+    text: string,
+  ): Promise<{
+    index: number;
+    text: string;
+    tokens: number;
+    characters: number;
+  }[]> {
+    const input: {
+      index: number;
+      text: string;
+      characters: number;
+      tokens: number;
+    }[] = text
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .map((line, index) => ({
+        index,
+        text: line.trim(),
+        characters: line.length,
+        tokens: -1,
+      }));
+
+    const body = JSON.stringify({
+      model: "GigaChat",
+      input: input.map((item) => item.text),
+    });
+
+    try {
+      const response = await fetch(
+        "https://gigachat.devices.sberbank.ru/api/v1/tokens/count",
+        {
+          method: "POST",
+          agent: httpsAgent,
+          headers: {
+            "X-Client-Id": this.clientId,
+            "X-Request-Id": randomUUID(),
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.gigachatAccessToken}`,
+          },
+          body,
+        },
+      );
+
+      if (response.status !== 200) {
+        const message =
+          `Error getting GigaChat tokens count: ${response.status}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+
+        return [];
+      }
+
+      const json = await response.json() as {
+        object: string;
+        characters: number;
+        tokens: number;
+      }[];
+
+      for (const index in json) {
+        const data = json[index];
+        input[index].tokens = data.tokens;
+      }
+
+      return input;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        const message = `Error getting GigaChat tokens count: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
+      return [];
+    }
   }
 
   private async rewritePost(text: string): Promise<string | null> {
-    try {
-      const response = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
-        method: 'POST',
-        agent: httpsAgent,
-        headers: {
-          'X-Client-Id': this.clientId,
-          'X-Request-Id': randomUUID(),
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.gigachatAccessToken}`,
-        },
-        body: JSON.stringify({
-          model: "GigaChat",
-          stream: false,
-          update_interval: 0,
-          messages: [
-            ...this.messages,
-            {
-              role: "user",
-              content: text,
-            },
-          ],
-        }),
-      });
+    const tokens = await this.getGigaChatTokensCount(text);
+    const maxTokens = 120000;
+    const maxCharacters = 1000000;
 
-      const json = await response.json() as { choices: { message: { content: string } }[] };
-      return json.choices[0].message.content;
+    let currentTokens = 0;
+    let currentCharacters = 0;
+    let currentText = "";
+
+    for (const token of tokens) {
+      if (
+        currentTokens + token.tokens > maxTokens ||
+        currentCharacters + token.characters > maxCharacters
+      ) {
+        break;
+      }
+
+      currentTokens += token.tokens;
+      currentCharacters += token.characters;
+      currentText += token.text;
+    }
+
+    const body = JSON.stringify({
+      model: "GigaChat",
+      stream: false,
+      update_interval: 0,
+      messages: [
+        ...this.messages,
+        {
+          role: "user",
+          content: currentText,
+        },
+      ],
+    });
+
+    try {
+      const response = await fetch(
+        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+        {
+          method: "POST",
+          agent: httpsAgent,
+          headers: {
+            "X-Client-Id": this.clientId,
+            "X-Request-Id": randomUUID(),
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.gigachatAccessToken}`,
+          },
+          body,
+        },
+      );
+
+      const json = await response.json() as {
+        choices: { message: { content: string } }[];
+      };
+
+      return json.choices
+        .map((choice) => choice.message.content)
+        .join();
     } catch (error) {
       if ((error as { status: number }).status === 403) {
-        await this.fetchGigachatAccessToken();
+        await this.updateGigachatAccessToken();
+
         return this.rewritePost(text);
       }
 
-      console.error("Error rewriting post with GigaChat:", error);
-      this.emit("error", error instanceof Error ? error : new Error(String(error)));
+      if (error instanceof Error) {
+        const message = `Error rewriting post with GigaChat: ${error.message}`;
+        this.emit(
+          "error",
+          new Error(message),
+        );
+      }
+
       return null;
     }
   }

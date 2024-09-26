@@ -924,13 +924,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"crypto@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "crypto@npm:1.0.1"
-  checksum: 10c0/fcf7dbd68ac5415b7fde7d7208fe203038e92e83e8a8fcf6e86ab4771ce3dd026d6967a990ba56b9d1c771378210814d5c90d907d3739fbd1723d552ad6c8ab8
-  languageName: node
-  linkType: hard
-
 "data-uri-to-buffer@npm:^4.0.0":
   version: 4.0.1
   resolution: "data-uri-to-buffer@npm:4.0.1"
@@ -1123,13 +1116,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"events@npm:^3.3.0":
-  version: 3.3.0
-  resolution: "events@npm:3.3.0"
-  checksum: 10c0/d6b6f2adbccbcda74ddbab52ed07db727ef52e31a61ed26db9feb7dc62af7fc8e060defa65e5f8af9449b86b52cc1a1f6a79f2eafcf4e62add2b7a1fa4a432f6
-  languageName: node
-  linkType: hard
-
 "execa@npm:^8.0.1":
   version: 8.0.1
   resolution: "execa@npm:8.0.1"
@@ -1207,13 +1193,6 @@ __metadata:
   dependencies:
     minipass: "npm:^7.0.3"
   checksum: 10c0/63e80da2ff9b621e2cb1596abcb9207f1cf82b968b116ccd7b959e3323144cce7fb141462200971c38bbf2ecca51695069db45265705bed09a7cd93ae5b89f94
-  languageName: node
-  linkType: hard
-
-"fs@npm:^0.0.1-security":
-  version: 0.0.1-security
-  resolution: "fs@npm:0.0.1-security"
-  checksum: 10c0/e0c0b585ec6f7483d63d067215d9d6bb2e0dba5912060d32554c8e566a0e22ee65e4c2a2b0567476efbbfb47682554b4711d69cab49950d01f227a3dfa7d671a
   languageName: node
   linkType: hard
 
@@ -1397,13 +1376,6 @@ __metadata:
   version: 4.0.0
   resolution: "indent-string@npm:4.0.0"
   checksum: 10c0/1e1904ddb0cb3d6cce7cd09e27a90184908b7a5d5c21b92e232c93579d314f0b83c246ffb035493d0504b1e9147ba2c9b21df0030f48673fba0496ecd698161f
-  languageName: node
-  linkType: hard
-
-"inherits@npm:2.0.3":
-  version: 2.0.3
-  resolution: "inherits@npm:2.0.3"
-  checksum: 10c0/6e56402373149ea076a434072671f9982f5fad030c7662be0332122fe6c0fa490acb3cc1010d90b6eff8d640b1167d77674add52dfd1bb85d545cf29e80e73e7
   languageName: node
   linkType: hard
 
@@ -2121,16 +2093,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"path@npm:^0.12.7":
-  version: 0.12.7
-  resolution: "path@npm:0.12.7"
-  dependencies:
-    process: "npm:^0.11.1"
-    util: "npm:^0.10.3"
-  checksum: 10c0/f795ce5438a988a590c7b6dfd450ec9baa1c391a8be4c2dea48baa6e0f5b199e56cd83b8c9ebf3991b81bea58236d2c32bdafe2c17a2e70c3a2e4c69891ade59
-  languageName: node
-  linkType: hard
-
 "pathe@npm:^1.1.1, pathe@npm:^1.1.2":
   version: 1.1.2
   resolution: "pathe@npm:1.1.2"
@@ -2185,13 +2147,6 @@ __metadata:
   version: 4.2.0
   resolution: "proc-log@npm:4.2.0"
   checksum: 10c0/17db4757c2a5c44c1e545170e6c70a26f7de58feb985091fb1763f5081cab3d01b181fb2dd240c9f4a4255a1d9227d163d5771b7e69c9e49a561692db865efb9
-  languageName: node
-  linkType: hard
-
-"process@npm:^0.11.1, process@npm:^0.11.10":
-  version: 0.11.10
-  resolution: "process@npm:0.11.10"
-  checksum: 10c0/40c3ce4b7e6d4b8c3355479df77aeed46f81b279818ccdc500124e6a5ab882c0cc81ff7ea16384873a95a74c4570b01b120f287abbdd4c877931460eca6084b3
   languageName: node
   linkType: hard
 
@@ -2627,33 +2582,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"util@npm:^0.10.3":
-  version: 0.10.4
-  resolution: "util@npm:0.10.4"
-  dependencies:
-    inherits: "npm:2.0.3"
-  checksum: 10c0/d29f6893e406b63b088ce9924da03201df89b31490d4d011f1c07a386ea4b3dbe907464c274023c237da470258e1805d806c7e4009a5974cd6b1d474b675852a
-  languageName: node
-  linkType: hard
-
 "vk-group-monitor@workspace:.":
   version: 0.0.0-use.local
   resolution: "vk-group-monitor@workspace:."
   dependencies:
     "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^22.7.2"
-    crypto: "npm:^1.0.1"
-    events: "npm:^3.3.0"
-    fs: "npm:^0.0.1-security"
     h3: "npm:^1.12.0"
     h3-basic-auth: "npm:^0.0.1"
     js-yaml: "npm:^4.1.0"
     level: "npm:^8.0.1"
     listhen: "npm:^1.8.0"
     node-fetch: "npm:^3.3.2"
-    path: "npm:^0.12.7"
     pkgroll: "npm:^2.5.0"
-    process: "npm:^0.11.10"
     tsx: "npm:^4.19.1"
     typescript: "npm:^5.6.2"
   bin:
