@@ -15,8 +15,8 @@
     class=" cursor-pointer flex flex-row items-center justify-center max-w-4xl mx-auto hover:bg-slate-600 transition-colors duration-500 sticky top-0 z-50 py-4 bg-slate-700 border border-t-0 border-slate-800 text-center rounded-b-xl mb-8 shadow-lg gap-4"
   >
     <div class="flex flex-row items-start flex-1 justify-between px-4 max-w-3xl mx-auto">
-      <div class="text-xl leading-none flex flex-col font-bold text-white">VK Group Monitor</div>
-      <div id="counter" class="rounded-full p-1 text-xs font-normal bg-slate-500 text-slate-50">0</div>
+      <div class="text-xl leading-none flex flex-row font-bold text-white"><span class="inline-flex mr-2">🖖🏻</span> VK Group Monitor</div>
+      <div id="counter" class="rounded-full p-1 text-xs font-normal bg-slate-500 text-slate-50 border border-slate-400 shadow-inner">0</div>
     </div>
   </h1>
   <div 
@@ -89,7 +89,7 @@
           const postDiv = document.createElement("div");
           postDiv.className = "border border-slate-300 rounded-lg mb-4 shadow relative";
           postDiv.innerHTML =
-            `<h2 onclick="toggleOriginal(this)" class="cursor-pointer select-none text-slate-700 bg-slate-100 hover:bg-slate-50 hover:text-slate-500 transition-colors duration-500 py-4 px-4 rounded-t-lg relative z-10 w-full border-b border-slate-200 flex flex-row items-center justify-between gap-4">
+            `<h2 onclick="toggleOriginal(this)" class="cursor-pointer select-none text-slate-700 bg-slate-100 hover:bg-slate-50 hover:text-slate-500 transition-colors duration-500 py-3 px-4 rounded-t-lg relative z-10 w-full border-b border-slate-200 flex flex-row items-center justify-between gap-4">
               <img
                 src="${groupState ? groupState.photo_50 : ""}"
                 class="flex max-w-12 max-h-12 sm:max-w-8 sm:max-h-8 w-auto self-center rounded-full"
@@ -108,7 +108,7 @@
             <div onclick="copyToClipboard(this)" class="rewritten relative cursor-default py-4 px-4 bg-white bg-opacity-80 text-slate-700 rounded-md leading-tight relative z-10">
               <pre class="font-sans text-sm whitespace-pre-wrap">${post.rewritten}</pre>
               <div class="copied z-20 leading-none transition-opacity duration-300 flex justify-center items-center absolute top-0 right-0 left-0 bottom-0 bg-slate-200/40 filter backdrop-blur-sm opacity-0 pointer-events-none">
-                <span class="px-2 py-1 bg-slate-200 uppercase border border-slate-300 text-slate-500 font-semibold shadow-sm bg-white rounded-md text-sm text-center">скопировано</span>
+                <span class="px-3 py-1 bg-blue-200 border border-slate-400 text-slate-700 font-semibold shadow-sm bg-slate-100 rounded-md text-sm text-center">текст скопирован</span>
               </div>
             </div>`;
 
