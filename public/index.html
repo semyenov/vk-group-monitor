@@ -10,9 +10,15 @@
 
 <body class="bg-slate-200 text-slate-700 font-sans">
   <h1
+    id="header"
     onclick="fetchPosts(); scrollToTop()"
-    class="cursor-pointer max-w-4xl mx-auto hover:bg-slate-800 transition-colors duration-500 sticky top-0 z-50 px-4 py-3 bg-slate-700 border border-slate-500 text-slate-100 text-center font-semibold rounded-b-xl text-2xl font-bold mb-8 shadow-xl"
-  >VK Group Monitor</h1>
+    class=" cursor-pointer flex flex-row max-w-4xl mx-auto hover:bg-blue-600 transition-colors duration-500 sticky top-0 z-50 py-4 bg-blue-700 border border-t-0 border-blue-800 text-center rounded-b-xl mb-8 shadow-2xl gap-4"
+  >
+    <div class="flex flex-row items-start flex-1 justify-between px-4 max-w-3xl mx-auto">
+      <div class="text-xl flex flex-col font-bold text-white">VK Group Monitor</div>
+      <div id="counter" class="rounded-full p-1 text-xs font-normal bg-blue-500 text-blue-50">0</div>
+    </div>
+  </h1>
   <div 
     id="posts" 
     class="max-w-3xl px-4 mx-auto"
@@ -74,6 +80,10 @@
       }
 
       if (posts.success) {
+        const counter = document.querySelector("#counter");
+        counter.textContent = posts.data.length;
+        postsDiv.innerHTML = "";
+
         posts.data.forEach((post) => {
           const groupState = getGroupState(post.groupId);
           const postDiv = document.createElement("div");
