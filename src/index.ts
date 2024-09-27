@@ -252,20 +252,28 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("updateGigachatAccessToken");
 
     try {
-      const accessToken = await gigaChatApi.updateGigachatAccessToken(this.gigaChatApiKey);
+      const accessToken = await gigaChatApi.updateGigachatAccessToken(
+        this.gigaChatApiKey,
+      );
       this.gigachatAccessToken = accessToken;
 
-      logger.debug("updateGigachatAccessToken response", this.gigachatAccessToken);
+      logger.debug(
+        "updateGigachatAccessToken response",
+        this.gigachatAccessToken,
+      );
 
       return this.gigachatAccessToken;
     } catch (error) {
-      this.emit("error", createError({
-        code: "VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR",
-        cause: error instanceof Error ? error : new Error(String(error)),
-        expected: true,
-        transient: false,
-        data: {},
-      }));
+      this.emit(
+        "error",
+        createError({
+          code: "VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR",
+          cause: error instanceof Error ? error : new Error(String(error)),
+          expected: true,
+          transient: false,
+          data: {},
+        }),
+      );
 
       logger.debug("updateGigachatAccessToken error", error);
 
@@ -306,7 +314,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       }
     }
 
-    this.pollTimeout = setTimeout(() => this.poll(), this.pollInterval);
+    this.pollTimeout = setTimeout(
+      () => this.poll(),
+      this.pollInterval,
+    );
   }
 
   private async fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
@@ -314,38 +325,55 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
     let hasMorePosts = true;
     while (hasMorePosts) {
-      logger.debug("fetchGroupPosts loop", { groupId: group.id, offset: group.offset });
+      logger.debug("fetchGroupPosts loop", {
+        groupId: group.id,
+        offset: group.offset,
+      });
+      try {
+        const posts = await vkApi.fetchPosts(
+          this.vkAccessToken,
+          this.clientId,
+          group.id,
+          group.offset,
+          this.postsPerRequest,
+        );
 
-      const posts = await vkApi.fetchPosts(
-        this.vkAccessToken,
-        this.clientId,
-        group.id,
-        group.offset,
-        this.postsPerRequest
-      );
-
-      if (posts.length === 0) {
-        hasMorePosts = false;
-        break;
-      }
-
-      for (const post of posts) {
-        if (post.date > group.lastCheckedDate) {
-          await this.processPost(post, group.id);
-        } else {
+        if (posts.length === 0) {
           hasMorePosts = false;
           break;
         }
-      }
 
-      await this.putGroup({
-        ...group,
-        offset: group.offset + posts.length,
-        lastCheckedDate: Math.max(
-          group.lastCheckedDate,
-          posts[0]?.date || 0
-        ),
-      });
+        for (const post of posts) {
+          if (post.date > group.lastCheckedDate) {
+            await this.processPost(post, group.id);
+          } else {
+            hasMorePosts = false;
+            break;
+          }
+        }
+
+        await this.putGroup({
+          ...group,
+          offset: group.offset + posts.length,
+          lastCheckedDate: Math.max(
+            group.lastCheckedDate,
+            posts[0]?.date || 0,
+          ),
+        });
+      } catch (error) {
+        logger.error("fetchGroupPosts error", error);
+
+        this.emit(
+          "error",
+          createError({
+            code: "VK_FETCH_GROUP_POSTS_ERROR",
+            cause: error instanceof Error ? error : new Error(String(error)),
+            expected: true,
+            transient: false,
+            data: { groupId: group.id },
+          }),
+        );
+      }
     }
 
     // Reset offset after processing all posts
@@ -386,27 +414,31 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       const fetchedGroups = await vkApi.fetchGroups(
         this.vkAccessToken,
         this.clientId,
-        groupIds
+        groupIds,
       );
 
       for (const data of fetchedGroups) {
         const group = await this.getGroup(data.id);
         await this.putGroup({
           ...data,
-          lastCheckedDate: group?.lastCheckedDate || Date.now() / 1000 - 1000 * 60 * 60 * 24,
+          lastCheckedDate: group?.lastCheckedDate ||
+            Date.now() / 1000 - 1000 * 60 * 60 * 24,
           offset: group?.offset || 0,
         });
       }
 
       logger.debug("updateGroups response", fetchedGroups);
     } catch (error) {
-      this.emit("error", createError({
-        code: "VK_MONITOR_UPDATE_GROUPS_ERROR",
-        cause: error instanceof Error ? error : new Error(String(error)),
-        expected: true,
-        transient: false,
-        data: {},
-      }));
+      this.emit(
+        "error",
+        createError({
+          code: "VK_MONITOR_UPDATE_GROUPS_ERROR",
+          cause: error instanceof Error ? error : new Error(String(error)),
+          expected: true,
+          transient: false,
+          data: {},
+        }),
+      );
 
       logger.debug("updateGroups error", error);
     }
@@ -414,7 +446,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   private async processPost(
     { id, text, date }: PostData,
-    groupId: number
+    groupId: number,
   ): Promise<void> {
     logger.debug("processPost", { id, text, date, groupId });
 
@@ -443,7 +475,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       this.messages,
       this.clientId,
       this.gigaChatApiKey,
-      this.gigachatAccessToken
+      this.gigachatAccessToken,
     );
 
     const post: VKGroupMonitorPost = {

@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import { randomUUID } from "crypto";
-import { VKGroupMonitorGroup, PostData } from "./types";
+import { PostData, VKGroupMonitorGroup } from "./types";
 import { logger } from "./logger";
 
 export async function fetchPosts(
@@ -10,7 +10,12 @@ export async function fetchPosts(
   offset: number,
   count: number,
 ): Promise<PostData[]> {
-  logger.debug(`Fetching posts for group ${groupId}`, { vkAccessToken, clientId, offset, count });
+  logger.debug(`Fetching posts for group ${groupId}`, {
+    vkAccessToken,
+    clientId,
+    offset,
+    count,
+  });
 
   const posts: PostData[] = [];
   const params = new URLSearchParams([
@@ -38,7 +43,9 @@ export async function fetchPosts(
       response?: { items: PostData[] };
     };
 
-    logger.debug(`Fetched posts for group ${groupId}`, { posts: json.response?.items });
+    logger.debug(`Fetched posts for group ${groupId}`, {
+      posts: json.response?.items,
+    });
 
     for (const post of json.response?.items || []) {
       if (post.text.length > 0 && post.text.length < 10000) {
@@ -52,8 +59,9 @@ export async function fetchPosts(
 
     return posts;
   } catch (error) {
-    logger.error(`Error: fetching posts for group ${groupId}`, { error });
-
+    logger.error(`Error: fetching posts for group ${groupId}`, {
+      error,
+    });
     throw new Error(`Error: fetching posts for group ${groupId}`);
   }
 }
@@ -87,8 +95,15 @@ export async function fetchGroups(
       response?: Omit<VKGroupMonitorGroup, "lastCheckedDate" | "offset">[];
     };
 
+    logger.debug(`Fetched groups ${groupIds.join(",")}`, {
+      groups: json.response,
+    });
+
     return json.response || [];
   } catch (error) {
-    throw new Error(`Error: fetching groups`);
+    logger.error(`Error: fetching groups ${groupIds.join(",")}`, {
+      error,
+    });
+    throw new Error(`Error: fetching groups ${groupIds.join(",")}`);
   }
 }
