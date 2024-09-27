@@ -67,7 +67,7 @@
           class="box-border relative z-10 z-20 px-4 py-3 leading-tight bg-white border-t rounded-t-lg rounded-b-lg shadow cursor-default border-t-slate-300 rewritten bg-opacity-80 text-slate-700"
           @click="copyToClipboard(post)">
           <pre
-            class="font-sans text-sm whitespace-pre-wrap text-wrap">{{ post.rewritten || 'Ошибка при получении текста' }}</pre>
+            class="font-sans text-sm break-words whitespace-pre-wrap text-wrap">{{ post.rewritten || 'Ошибка при получении текста' }}</pre>
           <div
             class="absolute top-0 bottom-0 left-0 right-0 z-20 flex items-center justify-center leading-none transition-opacity duration-300 rounded-lg shadow-lg copied bg-slate-200/40 filter backdrop-blur-sm"
             v-if="post.copied">
