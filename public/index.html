@@ -14,10 +14,10 @@
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-slate-100 text-slate-700">
+<body class="font-sans bg-slate-200 text-slate-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-6 transition-colors duration-500 border-b rounded-b-lg shadow-xl cursor-pointer max-w-screen hover:bg-slate-800 hover:text-slate-50 bg-slate-800/95 backdrop-blur border-b-slate-400"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-6 transition-colors duration-500 border-b rounded-b-lg shadow-xl cursor-pointer max-w-screen hover:bg-slate-800 hover:text-slate-50 bg-slate-900/85 backdrop-blur border-b-slate-400"
       @click="() => {
       fetchPosts()
       scrollToTop()
@@ -35,16 +35,17 @@
       </div>
     </h1>
     <div class="max-w-3xl px-4 mx-auto">
-      <div class="relative mb-4 border rounded-lg shadow-md border-slate-300 bg-slate-200" v-for="post in posts"
-        :key="post.id">
+      <div :class="post.showOriginal ? 'bg-slate-200' : 'bg-slate-100'"
+        class="relative mb-4 border rounded-lg shadow-lg border-slate-300 bg-slate-100 shadow-slate-200"
+        v-for="post in posts" :key="post.id">
         <h4
-          class="relative z-10 flex flex-row items-center justify-between px-2 py-2 text-sm transition-colors duration-500 rounded-lg cursor-pointer select-none text-slate-700 bg-slate-200 hover:text-slate-600/80"
+          class="relative z-10 flex flex-row items-center justify-between px-2 py-2 text-sm transition-colors duration-500 rounded-lg cursor-pointer select-none text-slate-700 hover:text-slate-600/80"
           @click="toggleOriginal(post)">
           <img
             class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-slate-50 shadow-inner-md shadow-slate-400"
             :src="getGroup(post.groupId)?.photo_50 || ''">
           <div class="flex flex-col items-start justify-center flex-1 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex flex-1 py-1 font-bold leading-none uppercase">
+            <div class="flex flex-1 py-1 font-bold leading-tight uppercase">
               {{ getGroup(post.groupId)?.name || post.groupId }}
             </div>
             <div
@@ -55,13 +56,13 @@
           </h2>
 
           <div
-            class="z-20 px-4 pt-4 pb-5 -mb-1 text-sm border-t rounded-t-lg shadow-md original text-slate-500 bg-slate-100/80 border-t-slate-300"
+            class="z-20 px-4 pt-4 pb-5 -mb-1 text-sm border-t rounded-t-lg shadow-sm original text-slate-500 bg-slate-100 border-t-slate-300"
             v-if="post.showOriginal">
             <p class="font-semibold text-slate-700">Оригинальный текст:</p>
             <p class="italic break-words text-slate-500">{{ post.original }}</p>
           </div>
           <div
-            class="box-border relative z-10 z-20 px-4 py-3 leading-tight bg-white border-t rounded-t-lg rounded-b-lg shadow-sm cursor-default border-t-slate-300 text-slate-700"
+            class="relative z-10 z-20 px-4 py-3 leading-tight border-t rounded-lg shadow-md cursor-default bg-slate-50 border-t-slate-300 text-slate-700"
             @click="copyToClipboard(post)">
             <pre
               class="font-sans text-sm break-words whitespace-pre-wrap text-wrap">{{ post.rewritten || 'Ошибка при получении текста' }}</pre>
