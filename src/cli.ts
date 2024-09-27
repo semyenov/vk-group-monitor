@@ -132,10 +132,9 @@ router.get(
   }),
 );
 
-app.use(router);
-
 const basicAuth = createBasicAuthMiddleware(config.auth);
 app.use(basicAuth);
+app.use(router);
 
 listen(toNodeListener(app), {
   port: 3000,
@@ -143,7 +142,7 @@ listen(toNodeListener(app), {
 
 process.on("SIGINT", async () => {
   console.log("Завершение работы...");
-  await monitor.stop();
+  monitor.stop();
 
   process.exit(0);
 });

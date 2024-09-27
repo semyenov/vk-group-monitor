@@ -3,6 +3,10 @@ import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
 import https from "https";
 import fetch from "node-fetch";
+import ModuleError from "module-error";
+import { createConsola } from "consola";
+
+const logger = createConsola({ defaults: { tag: "VKGroupMonitor" } });
 
 export interface VKGroupMonitorConfig extends Record<string, unknown> {
   vkAccessToken: string;
@@ -138,7 +142,7 @@ interface VKGroupMonitorEvents {
   newPost: [post: Post];
   postProcessed: [processedPost: VKGroupMonitorPost];
   postAlreadyProcessed: [storedPost: VKGroupMonitorPost];
-  error: [error: Error];
+  error: [error: ModuleError];
 }
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
@@ -148,10 +152,12 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     Pick<VKGroupMonitorGroup, "lastCheckedDate" | "offset">
   >;
 
-  // API keys
+  // GigaChat API keys
   private gigaChatApiKey: string;
-  private vkAccessToken: string;
   private gigachatAccessToken: string | null = null;
+
+  // VK API keys
+  private vkAccessToken: string;
 
   // Config
   private pollInterval: number;
@@ -159,7 +165,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private messages: { role: string; content: string }[];
 
   // Timeout for polling groups
-  private poolTimeout: NodeJS.Timeout | null = null;
+  private pollTimeout: NodeJS.Timeout | null = null;
 
   // LevelDB
   private postsDb: Level<string, VKGroupMonitorPost>;
@@ -168,27 +174,53 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   constructor(config: VKGroupMonitorConfig) {
     super();
 
+    logger.debug("constructor", config);
+
     if (!config.dbDir) {
-      throw new Error(
-        "DB_DIR is not set in the environment variables",
+      throw new ModuleError(
+        "DB_DIR is not set in configuration (required)",
+        {
+          code: "VK_MONITOR_CONFIG_DB_DIR_NOT_SET_ERROR",
+          cause: new Error(
+            "DB_DIR is not set in configuration (required)",
+          ),
+        },
       );
     }
 
     if (!config.vkAccessToken) {
-      throw new Error(
-        "VK_ACCESS_TOKEN is not set in the environment variables",
+      throw new ModuleError(
+        "VK_ACCESS_TOKEN is not set in configuration (required)",
+        {
+          code: "VK_MONITOR_CONFIG_VK_ACCESS_TOKEN_NOT_SET_ERROR",
+          cause: new Error(
+            "VK_ACCESS_TOKEN is not set in configuration (required)",
+          ),
+        },
       );
     }
 
     if (!config.gigachatApiKey) {
-      throw new Error(
-        "GIGACHAT_API_KEY is not set in the environment variables",
+      throw new ModuleError(
+        "GIGACHAT_API_KEY is not set in configuration (required)",
+        {
+          code: "VK_MONITOR_CONFIG_GIGACHAT_API_KEY_NOT_SET_ERROR",
+          cause: new Error(
+            "GIGACHAT_API_KEY is not set in configuration (required)",
+          ),
+        },
       );
     }
 
     if (config.groupIds.length === 0) {
-      throw new Error(
-        "GROUP_IDS is not set or invalid in the environment variables",
+      throw new ModuleError(
+        "GROUP_IDS is not set or invalid in configuration (required)",
+        {
+          code: "VK_MONITOR_CONFIG_GROUP_IDS_NOT_SET_ERROR",
+          cause: new Error(
+            "GROUP_IDS is not set or invalid in configuration (required)",
+          ),
+        },
       );
     }
 
@@ -235,19 +267,25 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async start(): Promise<void> {
-    await this.updateGroups();
+    logger.debug("start");
+
     await this.updateGigachatAccessToken();
+    await this.updateGroups();
 
     await this.poll();
   }
 
   public stop(): void {
-    if (this.poolTimeout) {
-      clearTimeout(this.poolTimeout);
+    logger.debug("stop");
+
+    if (this.pollTimeout) {
+      clearTimeout(this.pollTimeout);
     }
   }
 
   public async getPosts(): Promise<VKGroupMonitorPost[]> {
+    logger.debug("getPosts");
+
     const posts: VKGroupMonitorPost[] = [];
     for await (const key of this.postsDb.keys()) {
       const post = await this.postsDb.get(key);
@@ -261,6 +299,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async getPost(postId: number): Promise<VKGroupMonitorPost | null> {
+    logger.debug("getPost", postId);
+
     try {
       const post = await this.postsDb.get(postId.toString());
       if (!post) {
@@ -269,11 +309,18 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
       return post;
     } catch (error) {
-      if (error instanceof Error) {
-        const message = `Error getting post ${postId}: ${error.message}`;
+      if (error instanceof Error && "code" in error) {
+        if (error.code === "LEVEL_NOT_FOUND") {
+          return null;
+        }
+
+        const message = `Error: getting post ${postId}`;
         this.emit(
           "error",
-          new Error(message),
+          new ModuleError(message, {
+            code: "VK_MONITOR_LEVEL_GET_POST_ERROR",
+            cause: error,
+          }),
         );
       }
 
@@ -282,6 +329,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
+    logger.debug("getGroup", groupId);
+
     try {
       const state = await this.groupsDb.get(groupId.toString());
       if (!state) {
@@ -290,11 +339,18 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
       return state;
     } catch (error) {
-      if (error instanceof Error) {
-        const message = `Error getting group ${groupId}: ${error.message}`;
+      if (error instanceof Error && "code" in error) {
+        if (error.code === "LEVEL_NOT_FOUND") {
+          return null;
+        }
+
+        const message = `Error: getting group ${groupId}`;
         this.emit(
           "error",
-          new Error(message),
+          new ModuleError(message, {
+            code: "VK_MONITOR_LEVEL_GET_GROUP_ERROR",
+            cause: error,
+          }),
         );
       }
 
@@ -303,6 +359,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async getGroups(): Promise<VKGroupMonitorGroup[]> {
+    logger.debug("getGroups");
+
     const groups: VKGroupMonitorGroup[] = [];
     for (const groupId of this.state.keys()) {
       const group = await this.getGroup(groupId);
@@ -316,6 +374,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   private async updateGigachatAccessToken(): Promise<string | null> {
+    logger.debug("updateGigachatAccessToken");
+
     try {
       const response = await fetch(
         "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
@@ -336,15 +396,20 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       const json = await response.json() as { access_token: string };
       this.gigachatAccessToken = json["access_token"];
 
+      logger.debug("updateGigachatAccessToken response", json);
+
       return this.gigachatAccessToken;
     } catch (error) {
-      if (error instanceof Error) {
-        const message = `Error getting GigaChat access token: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      const message = `Error: getting GigaChat access token`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_FETCH_GIGACHAT_ACCESS_TOKEN_ERROR",
+          cause: error as Error,
+        }),
+      );
+
+      logger.debug("updateGigachatAccessToken error", error);
 
       return null;
     }
@@ -353,21 +418,27 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private async putGroup(
     group: VKGroupMonitorGroup,
   ): Promise<void> {
+    logger.debug("putGroup", group);
+
     try {
       await this.groupsDb.put(group.id.toString(), group);
     } catch (error) {
-      if (error instanceof Error) {
-        const message =
-          `Error saving state for group ${group.id}: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      const message = `Error: saving state for group ${group.id}`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_LEVEL_PUT_GROUP_ERROR",
+          cause: error as Error,
+        }),
+      );
+
+      logger.debug("putGroup error", error);
     }
   }
 
   private async poll(): Promise<void> {
+    logger.debug("poll");
+
     for (const groupId of this.state.keys()) {
       const group = await this.getGroup(groupId);
       if (group) {
@@ -375,7 +446,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       }
     }
 
-    this.poolTimeout = setTimeout(
+    this.pollTimeout = setTimeout(
       () => this.poll(),
       this.pollInterval,
     );
@@ -384,6 +455,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private async fetchGroupPosts(
     group: VKGroupMonitorGroup,
   ): Promise<void> {
+    logger.debug("fetchGroupPosts", group);
+
     let hasMorePosts = true;
 
     while (hasMorePosts) {
@@ -424,6 +497,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   private async updateGroups(): Promise<void> {
+    logger.debug("updateGroups");
+
     const groupIds: number[] = [];
 
     for (const groupId of this.state.keys()) {
@@ -473,6 +548,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         response?: Omit<VKGroupMonitorGroup, "lastCheckedDate" | "offset">[];
       };
 
+      logger.debug("updateGroups response", json);
+
       for (const data of json.response || []) {
         const group = await this.getGroup(data.id);
         await this.putGroup({
@@ -483,13 +560,16 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         });
       }
     } catch (error) {
-      if (error instanceof Error) {
-        const message = `Error fetching groups: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      const message = `Error: fetching groups`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_FETCH_GROUPS_ERROR",
+          cause: error as Error,
+        }),
+      );
+
+      logger.debug("updateGroups error", error);
     }
   }
 
@@ -498,6 +578,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     offset: number,
     count: number,
   ): Promise<Post[]> {
+    logger.debug("fetchPosts", { groupId, offset, count });
+
     const posts: Post[] = [];
     const params = new URLSearchParams([
       ["owner_id", "-" + groupId.toString()],
@@ -524,6 +606,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         response?: { items: Post[] };
       };
 
+      logger.debug("fetchPosts response", json);
+
       for (const post of json.response?.items || []) {
         if (post.text.length > 0 && post.text.length < 10000) {
           posts.push({
@@ -536,14 +620,16 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
       return posts;
     } catch (error) {
-      if (error instanceof Error) {
-        const message =
-          `Error fetching posts for group ${groupId}: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      const message = `Error: fetching posts for group ${groupId}`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_FETCH_POSTS_ERROR",
+          cause: error as Error,
+        }),
+      );
+
+      logger.debug("fetchPosts error", error);
 
       return [];
     }
@@ -553,6 +639,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     { id, text, date }: Post,
     groupId: number,
   ): Promise<void> {
+    logger.debug("processPost", { id, text, date, groupId });
+
     const storedPost = await this.getPost(id);
     if (storedPost && storedPost.rewritten !== null) {
       this.emit("postAlreadyProcessed", storedPost);
@@ -565,7 +653,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       date,
     });
 
-    const rewritten = await this.rewritePost(text);
+    const rewritten = await this.getGigaChatRewritePost(text);
     const post: VKGroupMonitorPost = {
       id,
       date,
@@ -581,19 +669,22 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private async putPost(
     post: VKGroupMonitorPost,
   ): Promise<void> {
+    logger.debug("putPost", post);
+
     try {
       await this.postsDb.put(post.id.toString(), post);
     } catch (error) {
-      if (error instanceof Error) {
-        const message =
-          `Error storing post ${post.id} for group ${post.groupId}: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      const message =
+        `Error: storing post ${post.id} for group ${post.groupId}`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_LEVEL_PUT_POST_ERROR",
+          cause: error as Error,
+        }),
+      );
 
-      return;
+      logger.debug("putPost error", error);
     }
   }
 
@@ -605,6 +696,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     tokens: number;
     characters: number;
   }[]> {
+    logger.debug("getGigaChatTokensCount", text);
+
     const input: {
       index: number;
       text: string;
@@ -642,16 +735,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         },
       );
 
-      if (response.status !== 200) {
-        const message =
-          `Error getting GigaChat tokens count: ${response.status}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-
-        return [];
-      }
+      logger.debug("getGigaChatTokensCount response", response);
 
       const json = await response.json() as {
         object: string;
@@ -666,20 +750,25 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
       return input
         .filter((item) => item.tokens > 0);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        const message = `Error getting GigaChat tokens count: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+    } catch (error) {
+      const message = `Error: getting GigaChat tokens count`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_FETCH_GIGACHAT_TOKENS_COUNT_ERROR",
+          cause: error as Error,
+        }),
+      );
+
+      logger.debug("getGigaChatTokensCount error", error);
 
       return [];
     }
   }
 
-  private async rewritePost(text: string): Promise<string | null> {
+  private async getGigaChatRewritePost(text: string): Promise<string | null> {
+    logger.debug("getGigaChatRewritePost", text);
+
     const tokens = await this.getGigaChatTokensCount(text);
     const maxTokens = 120000;
     const maxCharacters = 1000000;
@@ -734,23 +823,30 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         choices: { message: { content: string } }[];
       };
 
+      logger.debug("getGigaChatRewritePost", json);
+
       return json.choices
         .map((choice) => choice.message.content)
         .join();
     } catch (error) {
-      if ((error as { status: number }).status === 403) {
+      if (
+        error instanceof Response &&
+        (error.status === 401 || error.status === 403)
+      ) {
         await this.updateGigachatAccessToken();
-
-        return this.rewritePost(text);
+        return this.getGigaChatRewritePost(text);
       }
 
-      if (error instanceof Error) {
-        const message = `Error rewriting post with GigaChat: ${error.message}`;
-        this.emit(
-          "error",
-          new Error(message),
-        );
-      }
+      logger.debug("getGigaChatRewritePost", error);
+
+      const message = `Error: rewriting post with GigaChat`;
+      this.emit(
+        "error",
+        new ModuleError(message, {
+          code: "VK_MONITOR_FETCH_GIGACHAT_REWRITE_POST_ERROR",
+          cause: error as Error,
+        }),
+      );
 
       return null;
     }
