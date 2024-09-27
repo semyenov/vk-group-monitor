@@ -611,11 +611,12 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       characters: number;
       tokens: number;
     }[] = text
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
+      .split("\n\n")
+      .map((line) => line.trim())
+      .filter((line) => line && line.length > 0)
       .map((line, index) => ({
         index,
-        text: line.trim(),
+        text: line,
         characters: line.length,
         tokens: -1,
       }));
@@ -663,7 +664,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         input[index].tokens = data.tokens;
       }
 
-      return input;
+      return input
+        .filter((item) => item.tokens > 0);
     } catch (error: unknown) {
       if (error instanceof Error) {
         const message = `Error getting GigaChat tokens count: ${error.message}`;
