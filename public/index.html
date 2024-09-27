@@ -14,22 +14,22 @@
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-slate-200/60">
+<body class="font-sans bg-slate-200/40">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-2 mx-auto mb-6 transition-colors duration-500 border-b border-dashed rounded-b-lg shadow-md cursor-pointer shadow-slate-400/10 max-w-screen bg-slate-300/95 backdrop-blur-sm border-b-slate-400/50"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center py-3 mx-auto mb-6 transition-colors duration-500 border-b rounded-b-lg shadow-lg cursor-pointer shadow-slate-500/60 max-w-screen bg-slate-800/90 backdrop-blur-sm border-b-slate-600/50"
       @click="() => {
       fetchPosts()
       scrollToTop()
     }">
       <div class="flex flex-row items-start justify-center flex-1 max-w-3xl px-4 mx-auto ">
-        <div class="flex flex-row h-full mr-2 text-2xl font-semibold text-slate-600">
-          <span class="inline-flex">
+        <div class="flex flex-row h-full text-2xl font-normal text-slate-100">
+          <span class="inline-flex mr-2">
             VK Group Monitor
           </span>
         </div>
         <div
-          class="inline-flex items-center justify-center h-8 p-1 text-xs font-light border rounded-full shadow min-w-8 bg-slate-200 text-slate-500 border-slate-300 shadow-slate-400/20">
+          class="inline-flex items-center justify-center h-8 p-1 text-sm border rounded-full -md shadow-inner-lg min-w-8 bg-slate-200 text-slate-500 border-slate-400 shadow-slate-400/70">
           {{ posts.length }}
         </div>
       </div>
