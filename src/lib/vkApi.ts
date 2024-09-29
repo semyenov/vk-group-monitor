@@ -31,17 +31,19 @@ export async function fetchPosts(
       `https://api.vk.com/method/wall.get?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+        ],
       },
     );
 
     const json = await response.json() as {
       response?: { items: PostData[] };
     };
+
+    console.log(json);
 
     logger.debug(`Fetched posts for group ${groupId}`, {
       posts: json.response?.items,
@@ -83,11 +85,11 @@ export async function fetchGroups(
       `https://api.vk.com/method/groups.getById?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+        ],
       },
     );
 

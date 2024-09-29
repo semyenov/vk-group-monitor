@@ -7,7 +7,7 @@ import { createError } from "./errors";
 const logger = createConsola({ defaults: { tag: "GigaChatApi" } });
 
 export async function updateGigachatAccessToken(
-  gigaChatApiKey: string
+  gigaChatApiKey: string,
 ): Promise<string | null> {
   logger.debug("updateGigachatAccessToken");
 
@@ -23,7 +23,7 @@ export async function updateGigachatAccessToken(
           RqUID: randomUUID(),
         },
         body: new URLSearchParams([["scope", "GIGACHAT_API_PERS"]]),
-      }
+      },
     );
 
     const json = (await response.json()) as { access_token: string };
@@ -44,7 +44,7 @@ export async function getGigaChatTokensCount(
   text: string,
   clientId: string,
   gigaChatApiKey: string,
-  gigachatAccessToken: string
+  gigachatAccessToken: string,
 ): Promise<
   {
     index: number;
@@ -76,14 +76,14 @@ export async function getGigaChatTokensCount(
       {
         method: "POST",
         agent: httpsAgent,
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${gigachatAccessToken}`,
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+          ["Authorization", `Bearer ${gigachatAccessToken}`],
+        ],
         body,
-      }
+      },
     );
 
     const json = (await response.json()) as {
@@ -117,7 +117,7 @@ export async function getGigaChatRewritePost(
   messages: { role: string; content: string }[],
   clientId: string,
   gigaChatApiKey: string,
-  gigachatAccessToken: string
+  gigachatAccessToken: string,
 ): Promise<string | null> {
   logger.debug("getGigaChatRewritePost", text);
 
@@ -125,7 +125,7 @@ export async function getGigaChatRewritePost(
     text,
     clientId,
     gigaChatApiKey,
-    gigachatAccessToken
+    gigachatAccessToken,
   );
   const maxTokens = 120000;
   const maxCharacters = 1000000;
@@ -155,7 +155,7 @@ export async function getGigaChatRewritePost(
       ...messages,
       {
         role: "user",
-        content: currentText.trim(),
+        content: "Статья:\n\n" + currentText.trim(),
       },
     ],
   });
@@ -166,14 +166,14 @@ export async function getGigaChatRewritePost(
       {
         method: "POST",
         agent: httpsAgent,
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${gigachatAccessToken}`,
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+          ["Authorization", `Bearer ${gigachatAccessToken}`],
+        ],
         body,
-      }
+      },
     );
 
     const json = (await response.json()) as {
@@ -188,14 +188,16 @@ export async function getGigaChatRewritePost(
       error instanceof FetchError &&
       error.code === "401"
     ) {
-      const gigachatAccessToken = await updateGigachatAccessToken(gigaChatApiKey);
+      logger.debug("getGigaChatRewritePost 401 error");
+      const gigachatAccessToken = await updateGigachatAccessToken(
+        gigaChatApiKey,
+      );
       if (!gigachatAccessToken) {
         throw createError({
           code: "GIGACHAT_API_ACCESS_TOKEN_ERROR",
           cause: error instanceof Error ? error : new Error(String(error)),
           expected: true,
           transient: false,
-          data: {},
         });
       }
 
@@ -204,7 +206,7 @@ export async function getGigaChatRewritePost(
         messages,
         clientId,
         gigaChatApiKey,
-        gigachatAccessToken
+        gigachatAccessToken,
       );
     }
 

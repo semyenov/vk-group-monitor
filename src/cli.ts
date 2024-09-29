@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import yaml from "js-yaml";
 import fs from "fs";
-import { VKGroupMonitor, VKGroupMonitorConfig } from "./index";
+import { VKGroupMonitor } from "./index";
 import {
   createApp,
   createRouter,
@@ -12,6 +12,8 @@ import {
 } from "h3";
 import { listen } from "listhen";
 import { createBasicAuthMiddleware } from "h3-basic-auth";
+
+import type { VKGroupMonitorConfig } from "./lib/types";
 
 // Get config file path from command line arguments
 const args = process.argv.slice(2);
@@ -79,7 +81,7 @@ monitor
 const app = createApp();
 const router = createRouter();
 
-router.use(
+router.get(
   "/",
   defineEventHandler(async (event) => {
     return fs.readFileSync("./public/index.html", "utf8");
@@ -90,7 +92,10 @@ router.get(
   "/api/posts",
   defineEventHandler(async (event) => {
     const posts = await monitor.getPosts();
-    return { success: true, data: posts };
+    return {
+      success: true,
+      data: posts,
+    };
   }),
 );
 
@@ -99,15 +104,24 @@ router.get(
   defineEventHandler(async (event) => {
     const postId = getRouterParam(event, "id");
     if (!postId) {
-      return { success: false, error: "Post ID is required" };
+      return {
+        success: false,
+        error: "Post ID is required",
+      };
     }
 
     const post = await monitor.getPost(Number(postId));
     if (!post) {
-      return { success: false, error: "Post not found" };
+      return {
+        success: false,
+        error: "Post not found",
+      };
     }
 
-    return { success: true, data: post };
+    return {
+      success: true,
+      data: post,
+    };
   }),
 );
 
@@ -115,7 +129,10 @@ router.get(
   "/api/groups",
   defineEventHandler(async (event) => {
     const groups = await monitor.getGroups();
-    return { success: true, data: groups };
+    return {
+      success: true,
+      data: groups,
+    };
   }),
 );
 
@@ -124,11 +141,17 @@ router.get(
   defineEventHandler(async (event) => {
     const groupId = getRouterParam(event, "id");
     if (!groupId) {
-      return { success: false, error: "Group ID is required" };
+      return {
+        success: false,
+        error: "Group ID is required",
+      };
     }
 
     const group = await monitor.getGroup(Number(groupId));
-    return { success: true, data: group };
+    return {
+      success: true,
+      data: group,
+    };
   }),
 );
 

@@ -19,11 +19,7 @@ import type {
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   private clientId: string = randomUUID();
-
-  private state: Map<
-    number,
-    Pick<VKGroupMonitorGroup, "lastCheckedDate" | "offset">
-  >;
+  private groupIds: number[];
 
   // GigaChat API keys
   private gigaChatApiKey: string;
@@ -54,7 +50,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         code: "DB_DIR_NOT_SET_ERROR",
         expected: true,
         transient: false,
-        data: {},
       });
     }
 
@@ -63,7 +58,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         code: "VK_ACCESS_TOKEN_NOT_SET_ERROR",
         expected: true,
         transient: false,
-        data: {},
       });
     }
 
@@ -72,7 +66,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         code: "GIGACHAT_API_KEY_NOT_SET_ERROR",
         expected: true,
         transient: false,
-        data: {},
       });
     }
 
@@ -81,11 +74,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         code: "GROUP_IDS_NOT_SET_ERROR",
         expected: true,
         transient: false,
-        data: {},
       });
     }
 
-    const groupIds = config.groupIds;
+    this.groupIds = config.groupIds;
 
     this.vkAccessToken = config.vkAccessToken;
     this.gigaChatApiKey = config.gigachatApiKey;
@@ -93,17 +85,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     this.pollInterval = config.pollInterval;
     this.postsPerRequest = config.postsPerRequest;
     this.messages = config.messages;
-
-    // Set initial state
-    this.state = new Map(
-      groupIds.map((id) => [
-        id,
-        {
-          lastCheckedDate: Date.now() / 1000 - 1000 * 60 * 60 * 24,
-          offset: 0,
-        },
-      ]),
-    );
 
     // Initialize LevelDB
     this.postsDb = new Level<string, VKGroupMonitorPost>(
@@ -128,25 +109,20 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async start(): Promise<void> {
-    logger.debug("start");
-
     await this.updateGigachatAccessToken();
     await this.updateGroups();
 
-    this.poll();
+    await this.poll();
   }
 
   public stop(): void {
-    logger.debug("stop");
-
     if (this.pollTimeout) {
       clearTimeout(this.pollTimeout);
+      this.pollTimeout = null;
     }
   }
 
   public async getPosts(): Promise<VKGroupMonitorPost[]> {
-    logger.debug("getPosts");
-
     const posts: VKGroupMonitorPost[] = [];
     for await (const key of this.postsDb.keys()) {
       const post = await this.postsDb.get(key);
@@ -155,21 +131,15 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       }
     }
 
-    logger.debug("getPosts response", posts);
-
     return posts.sort((a, b) => b.date - a.date);
   }
 
   public async getPost(postId: number): Promise<VKGroupMonitorPost | null> {
-    logger.debug("getPost", postId);
-
     try {
       const post = await this.postsDb.get(postId.toString());
       if (!post) {
         return null;
       }
-
-      logger.debug("getPost response", post);
 
       return post;
     } catch (error) {
@@ -188,8 +158,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
             data: { postId },
           }),
         );
-
-        logger.debug("getPost error", error);
       }
 
       return null;
@@ -197,15 +165,11 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
-    logger.debug("getGroup", groupId);
-
     try {
       const group = await this.groupsDb.get(groupId.toString());
       if (!group) {
         return null;
       }
-
-      logger.debug("getGroup response", group);
 
       return group;
     } catch (error) {
@@ -226,24 +190,18 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         );
       }
 
-      logger.debug("getGroup error", error);
-
       return null;
     }
   }
 
   public async getGroups(): Promise<VKGroupMonitorGroup[]> {
-    logger.debug("getGroups");
-
     const groups: VKGroupMonitorGroup[] = [];
-    for (const groupId of this.state.keys()) {
+    for (const groupId of this.groupIds) {
       const group = await this.getGroup(groupId);
       if (group) {
         groups.push(group);
       }
     }
-
-    logger.debug("getGroups response", groups);
 
     return groups.sort((a, b) => b.lastCheckedDate - a.lastCheckedDate);
   }
@@ -275,19 +233,13 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         }),
       );
 
-      logger.debug("updateGigachatAccessToken error", error);
-
       return null;
     }
   }
 
   private async putGroup(group: VKGroupMonitorGroup): Promise<void> {
-    logger.debug("putGroup", group);
-
     try {
       await this.groupsDb.put(group.id.toString(), group);
-
-      logger.debug("putGroup response", group);
     } catch (error) {
       this.emit(
         "error",
@@ -299,15 +251,71 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           data: { group },
         }),
       );
-
-      logger.debug("putGroup error", error);
     }
   }
 
-  private async poll(): Promise<void> {
-    logger.debug("poll");
+  private async fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
+    let { offset, lastCheckedDate } = group;
+    let hasMorePosts = true;
 
-    for (const groupId of this.state.keys()) {
+    while (hasMorePosts) {
+      try {
+        const posts = await vkApi.fetchPosts(
+          this.vkAccessToken,
+          this.clientId,
+          group.id,
+          offset,
+          this.postsPerRequest,
+        );
+
+        if (posts.length === 0) {
+          hasMorePosts = false;
+          break;
+        }
+
+        for (const post of posts) {
+          console.log(
+            "post.date",
+            new Date(post.date * 1000).toLocaleString(),
+          );
+          console.log(
+            "lastCheckedDate",
+            new Date(lastCheckedDate * 1000).toLocaleString(),
+          );
+
+          if (post.date <= lastCheckedDate) {
+            hasMorePosts = false;
+            break;
+          }
+
+          await this.processPost(post, group.id);
+        }
+
+        offset += posts.length;
+      } catch (error) {
+        this.emit(
+          "error",
+          createError({
+            code: "VK_FETCH_GROUP_POSTS_ERROR",
+            cause: error instanceof Error ? error : new Error(String(error)),
+            expected: true,
+            transient: false,
+            data: { groupId: group.id, offset },
+          }),
+        );
+        hasMorePosts = false;
+      }
+    }
+
+    // Reset offset and update lastCheckedDate
+    group.offset = 0;
+    group.lastCheckedDate = Date.now() / 1000;
+
+    await this.putGroup(group);
+  }
+
+  private async poll(): Promise<void> {
+    for (const groupId of this.groupIds) {
       const group = await this.getGroup(groupId);
       if (group) {
         await this.fetchGroupPosts(group);
@@ -320,101 +328,25 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     );
   }
 
-  private async fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
-    logger.debug("fetchGroupPosts", group);
-
-    let hasMorePosts = true;
-    while (hasMorePosts) {
-      logger.debug("fetchGroupPosts loop", {
-        groupId: group.id,
-        offset: group.offset,
-      });
-      try {
-        const posts = await vkApi.fetchPosts(
-          this.vkAccessToken,
-          this.clientId,
-          group.id,
-          group.offset,
-          this.postsPerRequest,
-        );
-
-        if (posts.length === 0) {
-          hasMorePosts = false;
-          break;
-        }
-
-        for (const post of posts) {
-          if (post.date > group.lastCheckedDate) {
-            await this.processPost(post, group.id);
-          } else {
-            hasMorePosts = false;
-            break;
-          }
-        }
-
-        await this.putGroup({
-          ...group,
-          offset: group.offset + posts.length,
-          lastCheckedDate: Math.max(
-            group.lastCheckedDate,
-            posts[0]?.date || 0,
-          ),
-        });
-      } catch (error) {
-        logger.error("fetchGroupPosts error", error);
-
-        this.emit(
-          "error",
-          createError({
-            code: "VK_FETCH_GROUP_POSTS_ERROR",
-            cause: error instanceof Error ? error : new Error(String(error)),
-            expected: true,
-            transient: false,
-            data: { groupId: group.id },
-          }),
-        );
-      }
-    }
-
-    // Reset offset after processing all posts
-    await this.putGroup({
-      ...group,
-      offset: 0,
-    });
-
-    logger.debug("fetchGroupPosts reset offset", { groupId: group.id });
-  }
-
   private async updateGroups(): Promise<void> {
-    logger.debug("updateGroups");
+    const missingGroupIds: number[] = [];
 
-    const groupIds: number[] = [];
-
-    for (const groupId of this.state.keys()) {
+    for (const groupId of this.groupIds) {
       const group = await this.getGroup(groupId);
-      if (group) {
-        // Restore group state
-        this.state.set(groupId, {
-          lastCheckedDate: group.lastCheckedDate,
-          offset: group.offset,
-        });
-
-        continue;
+      if (!group) {
+        missingGroupIds.push(groupId);
       }
-
-      groupIds.push(groupId);
     }
 
-    if (groupIds.length === 0) {
+    if (missingGroupIds.length === 0) {
       return;
     }
 
-    // Fetch groups
     try {
       const fetchedGroups = await vkApi.fetchGroups(
         this.vkAccessToken,
         this.clientId,
-        groupIds,
+        missingGroupIds,
       );
 
       for (const data of fetchedGroups) {
@@ -422,7 +354,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         await this.putGroup({
           ...data,
           lastCheckedDate: group?.lastCheckedDate ||
-            Date.now() / 1000 - 1000 * 60 * 60 * 24,
+            Date.now() / 1000 - 60 * 60 * 24 * 5,
           offset: group?.offset || 0,
         });
       }
@@ -436,7 +368,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           cause: error instanceof Error ? error : new Error(String(error)),
           expected: true,
           transient: false,
-          data: {},
         }),
       );
 
@@ -451,12 +382,16 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("processPost", { id, text, date, groupId });
 
     const storedPost = await this.getPost(id);
-    if (storedPost && storedPost.rewritten !== null) {
+    if (storedPost) {
       this.emit("postAlreadyProcessed", storedPost);
       return;
     }
 
-    this.emit("newPost", { id, text, date });
+    this.emit("newPost", {
+      id,
+      text,
+      date,
+    });
 
     if (!this.gigachatAccessToken) {
       await this.updateGigachatAccessToken();
@@ -465,7 +400,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           code: "GIGACHAT_API_ACCESS_TOKEN_ERROR",
           expected: true,
           transient: false,
-          data: {},
         });
       }
     }

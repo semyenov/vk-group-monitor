@@ -22,12 +22,12 @@ export const ERROR_MESSAGES = {
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
 
 export function createError(params: {
+  message?: string;
   code: ErrorCode;
-  data: Record<string, any>;
   cause?: Error;
   expected?: boolean;
   transient?: boolean;
-  message?: string;
+  data?: Record<string, any>;
 }) {
   const message: string = params.message || ERROR_MESSAGES[params.code];
   return new ModuleError(message, {

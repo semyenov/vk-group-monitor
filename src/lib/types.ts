@@ -58,3 +58,20 @@ export interface VKGroupMonitorEvents {
   postAlreadyProcessed: [storedPost: VKGroupMonitorPost];
   error: [error: ModuleError];
 }
+
+export interface VKGroupMonitorPost {
+  id: number;
+  date: number;
+  groupId: number;
+  original: string;
+  rewritten: string | null;
+}
+
+export interface VKGroupMonitorPost {
+  id: number;
+  date: number;
+  groupId: number;
+  original: string;
+  rewritten: string | null;
+}
+
