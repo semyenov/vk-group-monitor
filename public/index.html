@@ -68,33 +68,13 @@
               </span>
             </div>
           </div>
-          <div v-if="post.attachments.photos.length > 0"
-            class="flex flex-col items-center justify-center w-full px-4 pt-2 pb-1 mb-4 border-dashed border-y border-zinc-300">
-            <div v-for="photo in post.attachments.photos" class="flex flex-col items-center justify-center w-full">
-              <img class="flex self-center w-auto mb-2 mr-2" :style="{
-                maxWidth: photo.width,
-                maxHeight: photo.height,
-              }" :src="photo.url || ''">
-              <span class="text-xs text-zinc-500">
-                {{ photo.text || photo.id }}
-              </span>
-            </div>
-          </div>
-          <div v-if="post.attachments.links.length > 0"
-            class="flex flex-row w-full px-4 py-1 mb-4 text-xs border-dashed border-y border-zinc-300">
-            <a target="_blank" v-for="link in post.attachments.links"
-              class="flex flex-row items-center justify-start text-zinc-500" :href="link.url">
-              <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:link"></span>
-              {{ link.title }}
-            </a>
-          </div>
           <pre
             class="px-4 pt-0 pb-6 text-xs italic break-words whitespace-pre-wrap text-zinc-600 text-wrap leading-1">{{ post.original }}</pre>
         </div>
 
         <!-- Rewrite -->
         <div
-          class="relative z-30 leading-tight border-t border-b rounded-lg shadow-md cursor-default bg-zinc-50 border-x border-zinc-300 text-zinc-600 border-b-zinc-400/60 shadow-zinc-400/10">
+          class="relative z-30 leading-tight border-t border-b divide-y rounded-lg shadow-md cursor-default bg-zinc-50 border-x border-zinc-300 text-zinc-600 border-b-zinc-400/60 shadow-zinc-400/10 divide-solid">
           <div
             class="flex flex-row items-center justify-center px-4 py-3 font-bold leading-none cursor-pointer sm:justify-between text-md"
             v-if="!state.opened[post.id]" @click="toggleOriginal(post.id)">
@@ -121,8 +101,44 @@
               </span>
             </div>
           </div>
-          <pre class="px-4 pt-0 pb-4 font-sans text-sm break-words whitespace-pre-wrap text-wrap"
-            :class="{ 'pt-4': state.opened[post.id] }">{{ post.rewritten[state.selected[post.id] !== undefined ? state.selected[post.id] : post.rewritten.length - 1] || 'Ошибка при получении текста' }}</pre>
+          <div class="flex flex-col items-center justify-center w-full divide-y divide-dashed">
+            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+              <span class="font-bold text-zinc-600">Переписанный текст:</span>
+            </div>
+            <pre class="w-full px-4 py-2 mb-2 font-sans text-sm break-words whitespace-pre-wrap text-wrap"
+              :class="{ 'pt-4': state.opened[post.id] }">{{ post.rewritten[state.selected[post.id] !== undefined ? state.selected[post.id] : post.rewritten.length - 1] || 'Ошибка при получении текста' }}</pre>
+          </div>
+          <div v-if="post.attachments.photos.length > 0"
+            class="flex flex-col items-start justify-start w-full divide-y divide-dashed">
+            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+              <span class="font-bold text-zinc-600">Вложенные фото:</span>
+            </div>
+            <div v-for="photo in post.attachments.photos"
+              class="flex flex-col items-start justify-center w-full px-4 py-2 mb-2 border-zinc-300">
+              <img class="flex w-auto mb-2 mr-2 max-w-12 max-h-12" :style="{
+                  width: photo.width,
+                  height: photo.height,
+                }" :src="photo.url || ''" />
+              <span class="inline-flex items-center justify-center text-xs text-zinc-500">
+                <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:image-multiple"></span>
+                <span class="text-zinc-600">{{ photo.text || photo.id }}</span>
+              </span>
+            </div>
+          </div>
+          <div v-if="post.attachments.links.length > 0"
+            class="flex flex-col items-center justify-center w-full divide-y divide-dashed">
+            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+              <span class="font-bold text-zinc-600">Вложенные ссылки:</span>
+            </div>
+            <div v-for="link in post.attachments.links"
+              class="flex flex-col items-center justify-center w-full px-4 py-2 mb-2 border-zinc-300">
+              <a target="_blank" class="inline-flex flex-row items-center justify-start w-full text-xs"
+                :href="link.url">
+                <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:link"></span>
+                <span class="text-zinc-600">{{ link.title }}</span>
+              </a>
+            </div>
+          </div>
           <div
             class="absolute top-0 bottom-0 left-0 right-0 z-20 flex items-center justify-center leading-none transition-opacity duration-300 rounded-lg shadow copied bg-zinc-200/40 filter backdrop-blur-sm"
             v-if="state.loading[post.id]">
