@@ -1,4 +1,3 @@
-import { Level } from "level";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
 import { FetchError } from "node-fetch";
@@ -11,7 +10,6 @@ import * as vkApi from "./lib/vkApi";
 import * as gigaChatApi from "./lib/gigaChatApi";
 
 import type {
-  PostData,
   VKGroupMonitorConfig,
   VKGroupMonitorEvents,
   VKGroupMonitorGroup,
@@ -34,6 +32,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   constructor(config: VKGroupMonitorConfig) {
     super();
+
     logger.debug("constructor", config);
 
     this.#validateConfig(config);
@@ -60,26 +59,29 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   #validateConfig(config: VKGroupMonitorConfig): void {
     if (!config.dbDir) {
-      throw this.#createConfigError("DB_DIR_NOT_SET_ERROR");
+      throw this.#handleError(
+        "DB_DIR_NOT_SET_ERROR",
+        new Error("DB_DIR_NOT_SET_ERROR"),
+      );
     }
     if (!config.vkAccessToken) {
-      throw this.#createConfigError("VK_ACCESS_TOKEN_NOT_SET_ERROR");
+      throw this.#handleError(
+        "VK_ACCESS_TOKEN_NOT_SET_ERROR",
+        new Error("VK_ACCESS_TOKEN_NOT_SET_ERROR"),
+      );
     }
     if (!config.gigachatApiKey) {
-      throw this.#createConfigError("GIGACHAT_API_KEY_NOT_SET_ERROR");
+      throw this.#handleError(
+        "GIGACHAT_API_KEY_NOT_SET_ERROR",
+        new Error("GIGACHAT_API_KEY_NOT_SET_ERROR"),
+      );
     }
     if (config.groupIds.length === 0) {
-      throw this.#createConfigError("GROUP_IDS_NOT_SET_ERROR");
+      throw this.#handleError(
+        "GROUP_IDS_NOT_SET_ERROR",
+        new Error("GROUP_IDS_NOT_SET_ERROR"),
+      );
     }
-  }
-
-  #createConfigError(code: ErrorCode): Error {
-    return createError({
-      code,
-      expected: true,
-      transient: false,
-      data: {},
-    });
   }
 
   #initializeState(config: VKGroupMonitorConfig): void {
@@ -114,7 +116,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   async #updateGigachatAccessToken(): Promise<string | null> {
     try {
       this.#gigachatAccessToken = await gigaChatApi.updateGigachatAccessToken(
-        this.#gigaChatApiKey
+        this.#gigaChatApiKey,
       );
       return this.#gigachatAccessToken;
     } catch (error) {
@@ -133,7 +135,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
     this.#pollTimeout = setTimeout(
       () => this.#poll(),
-      this.#pollInterval
+      this.#pollInterval,
     );
   }
 
@@ -149,7 +151,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           this.#clientId,
           group.id,
           offset,
-          this.#postsPerRequest
+          this.#postsPerRequest,
         );
 
         if (posts.length === 0) {
@@ -168,7 +170,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           }
         }
 
-
         offset += posts.length;
       } catch (error) {
         this.#handleError("VK_FETCH_GROUP_POSTS_ERROR", error, {
@@ -185,12 +186,25 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   }
 
   public async processPost(
-    { id, original, date, rewritten, groupId }: VKGroupMonitorPost,
+    {
+      id,
+      original,
+      date,
+      rewritten,
+      groupId,
+      viewsCount,
+      repostsCount,
+      likesCount,
+      attachments,
+    }: VKGroupMonitorPost,
   ): Promise<VKGroupMonitorPost | null> {
     if (!this.#gigachatAccessToken) {
       await this.#updateGigachatAccessToken();
       if (!this.#gigachatAccessToken) {
-        throw this.#createConfigError("GIGACHAT_API_ACCESS_TOKEN_ERROR");
+        throw this.#handleError(
+          "GIGACHAT_API_ACCESS_TOKEN_ERROR",
+          new Error("GIGACHAT_API_ACCESS_TOKEN_ERROR"),
+        );
       }
     }
 
@@ -204,7 +218,14 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       date,
       groupId,
       original,
-      rewritten: [...rewritten, rewrittenPost],
+      viewsCount,
+      repostsCount,
+      likesCount,
+      attachments,
+      rewritten: [
+        ...rewritten,
+        rewrittenPost,
+      ],
     };
 
     await this.#putPost(post);
@@ -219,7 +240,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       this.#messages,
       this.#clientId,
       this.#gigaChatApiKey,
-      this.#gigachatAccessToken!
+      this.#gigachatAccessToken!,
     );
   }
 
@@ -240,7 +261,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         expected: true,
         transient: false,
         data,
-      })
+      }),
     );
     logger.debug(`${code} error`, error);
   }
@@ -337,7 +358,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
             cause: error,
             expected: true,
             transient: false,
-            data: { postId }
+            data: { postId },
           }),
         );
 
@@ -347,7 +368,6 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       return null;
     }
   }
-
 
   async #putGroup(group: VKGroupMonitorGroup): Promise<void> {
     try {

@@ -1,4 +1,3 @@
-
 import ModuleError from "module-error";
 
 export interface VKGroupMonitorConfig extends Record<string, unknown> {
@@ -49,8 +48,8 @@ export interface PostData {
     user_likes: boolean;
   };
   attachments: (
-    PhotoAttachment | 
-    LinkAttachment
+    | PhotoAttachment
+    | LinkAttachment
   )[];
 }
 
@@ -130,6 +129,24 @@ export interface VKGroupMonitorPost {
   groupId: number;
   original: string;
   rewritten: string[];
+  viewsCount: number;
+  repostsCount: number;
+  likesCount: number;
+  attachments: {
+    links: {
+      url: string;
+      title: string;
+      caption: string;
+      description: string;
+    }[];
+    photos: {
+      id: number;
+      url: string;
+      width: number;
+      height: number;
+      text: string;
+    }[];
+  };
 }
 
 export interface VKGroupMonitorEvents {
