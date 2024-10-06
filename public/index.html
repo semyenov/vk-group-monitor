@@ -19,20 +19,21 @@
 <body class="font-sans bg-zinc-100 text-zinc-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b rounded-b-lg shadow-lg cursor-pointer shadow-zinc-400/30 max-w-screen hover:text-zinc-50 bg-zinc-300/95 backdrop-blur border-b-zinc-400/40"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg cursor-pointer rounded-b-xl shadow-zinc-400/40 max-w-screen hover:text-zinc-50 bg-zinc-700/90 backdrop-blur border-b-zinc-800"
       @click="() => {
       fetchPosts()
       scrollToTop()
     }">
       <div class="flex flex-row items-center justify-between flex-1 max-w-3xl px-4 mx-auto">
-        <div class="inline-flex flex-row items-center justify-center h-full mr-4 text-2xl font-bold text-zinc-600">
-          <span class="w-8 h-8 mr-2 iconify-inline" data-icon="ion:logo-vk"></span>
-          <span class>Group Monitor</span>
+        <div
+          class="inline-flex flex-row items-center justify-center h-full mr-4 text-2xl font-bold drop-shadow-xl drop-shadow-zinc-100 text-zinc-50">
+          <span class="w-8 h-8 mr-2 text-zinc-200 iconify-inline" data-icon="ion:logo-vk"></span>
+          <span class="text-zinc-50">Group Monitor</span>
         </div>
         <div
-          class="inline-flex items-center justify-center py-0.5 px-2 box-content border leading-0 rounded-lg bg-zinc-500 border-zinc-300 shadow shadow-zinc-400/20 font-bold">
-          <span class="px-1 text-md text-zinc-50">{{ posts.length }}</span>
-          <span class="w-4 h-4 iconify-inline text-zinc-200" data-icon="ion:newspaper-sharp"></span>
+          class="inline-flex items-center justify-center py-0.5 px-2 box-content border leading-none rounded-md bg-zinc-700 hover:bg-zinc-800 hover:border-zinc-500/80 transition-colors duration-300 border-zinc-500 shadow shadow-zinc-800/20 font-bold">
+          <span class="px-1 text-lg text-zinc-200">{{ posts.length }}</span>
+          <span class="w-4 iconify-inline text-zinc-100" data-icon="ion:newspaper-sharp"></span>
         </div>
       </div>
     </h1>
