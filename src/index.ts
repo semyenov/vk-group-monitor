@@ -184,7 +184,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   public async processPost(
     { id, original, date, rewritten, groupId }: VKGroupMonitorPost,
-  ): Promise<void> {
+  ): Promise<VKGroupMonitorPost | null> {
     if (!this.#gigachatAccessToken) {
       await this.#updateGigachatAccessToken();
       if (!this.#gigachatAccessToken) {
@@ -194,7 +194,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
     const rewrittenPost = await this.#getRewrittenPost(original);
     if (!rewrittenPost) {
-      return;
+      return null;
     }
 
     const post: VKGroupMonitorPost = {
