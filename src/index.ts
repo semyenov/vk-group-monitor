@@ -2,8 +2,9 @@ import { Level } from "level";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
 import { FetchError } from "node-fetch";
-
-import { createError } from "./lib/errors";
+import { createStorage, type Storage } from "unstorage";
+import fsDriver from "unstorage/drivers/fs";
+import { createError, ErrorCode } from "./lib/errors";
 import { logger } from "./lib/logger";
 
 import * as vkApi from "./lib/vkApi";
@@ -18,129 +19,278 @@ import type {
 } from "./lib/types";
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
-  private clientId: string = randomUUID();
-
-  private state: Map<
-    number,
-    Pick<VKGroupMonitorGroup, "lastCheckedDate" | "offset">
-  >;
-
-  // GigaChat API keys
-  private gigaChatApiKey: string;
-  private gigachatAccessToken: string | null = null;
-
-  // VK API keys
-  private vkAccessToken: string;
-
-  // Config
-  private pollInterval: number;
-  private postsPerRequest: number;
-  private messages: { role: string; content: string }[];
-
-  // Timeout for polling groups
-  private pollTimeout: NodeJS.Timeout | null = null;
-
-  // LevelDB
-  private postsDb: Level<string, VKGroupMonitorPost>;
-  private groupsDb: Level<string, VKGroupMonitorGroup>;
+  // Private fields
+  #clientId: string = randomUUID();
+  #groupIds: number[] = [];
+  #gigaChatApiKey: string = "";
+  #gigachatAccessToken: string | null = null;
+  #vkAccessToken: string = "";
+  #pollInterval: number = 10000;
+  #postsPerRequest: number = 100;
+  #messages: { role: string; content: string }[] = [];
+  #pollTimeout: NodeJS.Timeout | null = null;
+  #postsDb: Storage<VKGroupMonitorPost> | null = null;
+  #groupsDb: Storage<VKGroupMonitorGroup> | null = null;
 
   constructor(config: VKGroupMonitorConfig) {
     super();
-
     logger.debug("constructor", config);
 
-    if (!config.dbDir) {
-      throw createError({
-        code: "DB_DIR_NOT_SET_ERROR",
-        expected: true,
-        transient: false,
-        data: {},
-      });
-    }
-
-    if (!config.vkAccessToken) {
-      throw createError({
-        code: "VK_ACCESS_TOKEN_NOT_SET_ERROR",
-        expected: true,
-        transient: false,
-        data: {},
-      });
-    }
-
-    if (!config.gigachatApiKey) {
-      throw createError({
-        code: "GIGACHAT_API_KEY_NOT_SET_ERROR",
-        expected: true,
-        transient: false,
-        data: {},
-      });
-    }
-
-    if (config.groupIds.length === 0) {
-      throw createError({
-        code: "GROUP_IDS_NOT_SET_ERROR",
-        expected: true,
-        transient: false,
-        data: {},
-      });
-    }
-
-    const groupIds = config.groupIds;
-
-    this.vkAccessToken = config.vkAccessToken;
-    this.gigaChatApiKey = config.gigachatApiKey;
-
-    this.pollInterval = config.pollInterval;
-    this.postsPerRequest = config.postsPerRequest;
-    this.messages = config.messages;
-
-    // Set initial state
-    this.state = new Map(
-      groupIds.map((id) => [
-        id,
-        {
-          lastCheckedDate: Date.now() / 1000 - 1000 * 60 * 60 * 24,
-          offset: 0,
-        },
-      ]),
-    );
-
-    // Initialize LevelDB
-    this.postsDb = new Level<string, VKGroupMonitorPost>(
-      `${config.dbDir}/posts`,
-      {
-        valueEncoding: "json",
-        errorIfExists: false,
-        createIfMissing: true,
-      },
-    );
-
-    this.groupsDb = new Level<string, VKGroupMonitorGroup>(
-      `${config.dbDir}/groups`,
-      {
-        valueEncoding: "json",
-        errorIfExists: false,
-        createIfMissing: true,
-      },
-    );
-
-    logger.debug("constructor response", this);
+    this.#validateConfig(config);
+    this.#initializeState(config);
+    this.#initializeDatabases(config.dbDir);
   }
 
   public async start(): Promise<void> {
     logger.debug("start");
 
-    await this.updateGigachatAccessToken();
-    await this.updateGroups();
+    await this.#updateGigachatAccessToken();
+    await this.#updateGroups();
 
-    this.poll();
+    this.#poll();
   }
 
   public stop(): void {
     logger.debug("stop");
 
-    if (this.pollTimeout) {
-      clearTimeout(this.pollTimeout);
+    if (this.#pollTimeout) {
+      clearTimeout(this.#pollTimeout);
+    }
+  }
+
+  #validateConfig(config: VKGroupMonitorConfig): void {
+    if (!config.dbDir) {
+      throw this.#createConfigError("DB_DIR_NOT_SET_ERROR");
+    }
+    if (!config.vkAccessToken) {
+      throw this.#createConfigError("VK_ACCESS_TOKEN_NOT_SET_ERROR");
+    }
+    if (!config.gigachatApiKey) {
+      throw this.#createConfigError("GIGACHAT_API_KEY_NOT_SET_ERROR");
+    }
+    if (config.groupIds.length === 0) {
+      throw this.#createConfigError("GROUP_IDS_NOT_SET_ERROR");
+    }
+  }
+
+  #createConfigError(code: ErrorCode): Error {
+    return createError({
+      code,
+      expected: true,
+      transient: false,
+      data: {},
+    });
+  }
+
+  #initializeState(config: VKGroupMonitorConfig): void {
+    this.#vkAccessToken = config.vkAccessToken;
+    this.#gigaChatApiKey = config.gigachatApiKey;
+    this.#pollInterval = config.pollInterval;
+    this.#postsPerRequest = config.postsPerRequest;
+    this.#messages = config.messages;
+    this.#groupIds = config.groupIds;
+  }
+
+  #initializeDatabases(dbDir: string): void {
+    this.#postsDb! = createStorage({
+      driver: fsDriver({
+        base: `${dbDir}/posts`,
+        watchOptions: {
+          useFsEvents: true,
+        },
+      }),
+    });
+
+    this.#groupsDb = createStorage({
+      driver: fsDriver({
+        base: `${dbDir}/groups`,
+        watchOptions: {
+          useFsEvents: true,
+        },
+      }),
+    });
+  }
+
+  async #updateGigachatAccessToken(): Promise<string | null> {
+    try {
+      this.#gigachatAccessToken = await gigaChatApi.updateGigachatAccessToken(
+        this.#gigaChatApiKey
+      );
+      return this.#gigachatAccessToken;
+    } catch (error) {
+      this.#handleError("VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR", error);
+      return null;
+    }
+  }
+
+  async #poll(): Promise<void> {
+    for (const groupId of this.#groupIds) {
+      const group = await this.getGroup(groupId);
+      if (group) {
+        await this.#fetchGroupPosts(group);
+      }
+    }
+
+    this.#pollTimeout = setTimeout(
+      () => this.#poll(),
+      this.#pollInterval
+    );
+  }
+
+  async #fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
+    let hasMorePosts = true;
+    let lastCheckedDate = group.lastCheckedDate;
+    let offset = group.offset;
+
+    while (hasMorePosts) {
+      try {
+        const posts = await vkApi.fetchPosts(
+          this.#vkAccessToken,
+          this.#clientId,
+          group.id,
+          offset,
+          this.#postsPerRequest
+        );
+
+        if (posts.length === 0) {
+          hasMorePosts = false;
+          break;
+        }
+
+        for (const post of posts) {
+          if (post.date > group.lastCheckedDate) {
+            await this.processPost(post);
+            lastCheckedDate = Math.max(lastCheckedDate, post.date);
+          } else {
+            hasMorePosts = false;
+            break;
+          }
+        }
+
+        offset += posts.length;
+      } catch (error) {
+        this.#handleError("VK_FETCH_GROUP_POSTS_ERROR", error, {
+          groupId: group.id,
+        });
+      }
+    }
+
+    await this.#putGroup({
+      ...group,
+      offset: 0,
+      lastCheckedDate,
+    });
+  }
+
+  public async processPost(
+    { id, original, date, rewritten, groupId }: VKGroupMonitorPost,
+  ): Promise<void> {
+    if (!this.#gigachatAccessToken) {
+      await this.#updateGigachatAccessToken();
+      if (!this.#gigachatAccessToken) {
+        throw this.#createConfigError("GIGACHAT_API_ACCESS_TOKEN_ERROR");
+      }
+    }
+
+    const rewrittenPost = await this.#getRewrittenPost(original);
+    if (!rewrittenPost) {
+      return;
+    }
+
+    const post: VKGroupMonitorPost = {
+      id,
+      date,
+      groupId,
+      original,
+      rewritten: [...rewritten, rewrittenPost],
+    };
+
+    await this.#putPost(post);
+    this.emit("postProcessed", post);
+
+    return post;
+  }
+
+  async #getRewrittenPost(text: string): Promise<string | null> {
+    return await gigaChatApi.getGigaChatRewritePost(
+      text,
+      this.#messages,
+      this.#clientId,
+      this.#gigaChatApiKey,
+      this.#gigachatAccessToken!
+    );
+  }
+
+  async #putPost(post: VKGroupMonitorPost): Promise<void> {
+    try {
+      await this.#postsDb!.setItem(post.id.toString(), post);
+    } catch (error) {
+      this.#handleError("VK_MONITOR_LEVEL_PUT_POST_ERROR", error, { post });
+    }
+  }
+
+  #handleError(code: ErrorCode, error: unknown, data: object = {}): void {
+    this.emit(
+      "error",
+      createError({
+        code,
+        cause: error instanceof Error ? error : new Error(String(error)),
+        expected: true,
+        transient: false,
+        data,
+      })
+    );
+    logger.debug(`${code} error`, error);
+  }
+
+  async #updateGroups(): Promise<void> {
+    logger.debug("updateGroups");
+
+    const missingGroupIds: number[] = [];
+
+    for (const groupId of this.#groupIds) {
+      const group = await this.getGroup(groupId);
+      if (!group) {
+        missingGroupIds.push(groupId);
+      }
+    }
+
+    if (missingGroupIds.length === 0) {
+      return;
+    }
+
+    // Fetch groups
+    try {
+      const fetchedGroups = await vkApi.fetchGroups(
+        this.#vkAccessToken,
+        this.#clientId,
+        missingGroupIds,
+      );
+
+      for (const data of fetchedGroups) {
+        const group = await this.getGroup(data.id);
+        await this.#putGroup({
+          ...data,
+          lastCheckedDate: group?.lastCheckedDate ||
+            Date.now() / 1000 - 60 * 60 * 24,
+          offset: group?.offset || 0,
+        });
+      }
+
+      logger.debug("updateGroups response", fetchedGroups);
+    } catch (error) {
+      this.emit(
+        "error",
+        createError({
+          code: "VK_MONITOR_UPDATE_GROUPS_ERROR",
+          cause: error instanceof Error ? error : new Error(String(error)),
+          expected: true,
+          transient: false,
+          data: {},
+        }),
+      );
+
+      logger.debug("updateGroups error", error);
     }
   }
 
@@ -148,8 +298,8 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("getPosts");
 
     const posts: VKGroupMonitorPost[] = [];
-    for await (const key of this.postsDb.keys()) {
-      const post = await this.postsDb.get(key);
+    for (const key of await this.#postsDb!.getKeys("")) {
+      const post = await this.#postsDb!.getItem(key);
       if (post) {
         posts.push(post);
       }
@@ -164,7 +314,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("getPost", postId);
 
     try {
-      const post = await this.postsDb.get(postId.toString());
+      const post = await this.#postsDb!.getItem(postId.toString());
       if (!post) {
         return null;
       }
@@ -185,7 +335,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
             cause: error,
             expected: true,
             transient: false,
-            data: { postId },
+            data: { postId }
           }),
         );
 
@@ -196,16 +346,23 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     }
   }
 
+
+  async #putGroup(group: VKGroupMonitorGroup): Promise<void> {
+    try {
+      await this.#groupsDb!.setItem(group.id.toString(), group);
+    } catch (error) {
+      this.#handleError("VK_MONITOR_LEVEL_PUT_GROUP_ERROR", error, { group });
+    }
+  }
+
   public async getGroup(groupId: number): Promise<VKGroupMonitorGroup | null> {
     logger.debug("getGroup", groupId);
 
     try {
-      const group = await this.groupsDb.get(groupId.toString());
+      const group = await this.#groupsDb!.getItem(groupId.toString());
       if (!group) {
         return null;
       }
-
-      logger.debug("getGroup response", group);
 
       return group;
     } catch (error) {
@@ -236,7 +393,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("getGroups");
 
     const groups: VKGroupMonitorGroup[] = [];
-    for (const groupId of this.state.keys()) {
+    for (const groupId of this.#groupIds) {
       const group = await this.getGroup(groupId);
       if (group) {
         groups.push(group);
@@ -246,270 +403,5 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     logger.debug("getGroups response", groups);
 
     return groups.sort((a, b) => b.lastCheckedDate - a.lastCheckedDate);
-  }
-
-  private async updateGigachatAccessToken(): Promise<string | null> {
-    logger.debug("updateGigachatAccessToken");
-
-    try {
-      const accessToken = await gigaChatApi.updateGigachatAccessToken(
-        this.gigaChatApiKey,
-      );
-      this.gigachatAccessToken = accessToken;
-
-      logger.debug(
-        "updateGigachatAccessToken response",
-        this.gigachatAccessToken,
-      );
-
-      return this.gigachatAccessToken;
-    } catch (error) {
-      this.emit(
-        "error",
-        createError({
-          code: "VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR",
-          cause: error instanceof Error ? error : new Error(String(error)),
-          expected: true,
-          transient: false,
-          data: {},
-        }),
-      );
-
-      logger.debug("updateGigachatAccessToken error", error);
-
-      return null;
-    }
-  }
-
-  private async putGroup(group: VKGroupMonitorGroup): Promise<void> {
-    logger.debug("putGroup", group);
-
-    try {
-      await this.groupsDb.put(group.id.toString(), group);
-
-      logger.debug("putGroup response", group);
-    } catch (error) {
-      this.emit(
-        "error",
-        createError({
-          code: "VK_MONITOR_LEVEL_PUT_GROUP_ERROR",
-          cause: error instanceof Error ? error : new Error(String(error)),
-          expected: true,
-          transient: false,
-          data: { group },
-        }),
-      );
-
-      logger.debug("putGroup error", error);
-    }
-  }
-
-  private async poll(): Promise<void> {
-    logger.debug("poll");
-
-    for (const groupId of this.state.keys()) {
-      const group = await this.getGroup(groupId);
-      if (group) {
-        await this.fetchGroupPosts(group);
-      }
-    }
-
-    this.pollTimeout = setTimeout(
-      () => this.poll(),
-      this.pollInterval,
-    );
-  }
-
-  private async fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
-    logger.debug("fetchGroupPosts", group);
-
-    let hasMorePosts = true;
-    while (hasMorePosts) {
-      logger.debug("fetchGroupPosts loop", {
-        groupId: group.id,
-        offset: group.offset,
-      });
-      try {
-        const posts = await vkApi.fetchPosts(
-          this.vkAccessToken,
-          this.clientId,
-          group.id,
-          group.offset,
-          this.postsPerRequest,
-        );
-
-        if (posts.length === 0) {
-          hasMorePosts = false;
-          break;
-        }
-
-        for (const post of posts) {
-          if (post.date > group.lastCheckedDate) {
-            await this.processPost(post, group.id);
-          } else {
-            hasMorePosts = false;
-            break;
-          }
-        }
-
-        await this.putGroup({
-          ...group,
-          offset: group.offset + posts.length,
-          lastCheckedDate: Math.max(
-            group.lastCheckedDate,
-            posts[0]?.date || 0,
-          ),
-        });
-      } catch (error) {
-        logger.error("fetchGroupPosts error", error);
-
-        this.emit(
-          "error",
-          createError({
-            code: "VK_FETCH_GROUP_POSTS_ERROR",
-            cause: error instanceof Error ? error : new Error(String(error)),
-            expected: true,
-            transient: false,
-            data: { groupId: group.id },
-          }),
-        );
-      }
-    }
-
-    // Reset offset after processing all posts
-    await this.putGroup({
-      ...group,
-      offset: 0,
-    });
-
-    logger.debug("fetchGroupPosts reset offset", { groupId: group.id });
-  }
-
-  private async updateGroups(): Promise<void> {
-    logger.debug("updateGroups");
-
-    const groupIds: number[] = [];
-
-    for (const groupId of this.state.keys()) {
-      const group = await this.getGroup(groupId);
-      if (group) {
-        // Restore group state
-        this.state.set(groupId, {
-          lastCheckedDate: group.lastCheckedDate,
-          offset: group.offset,
-        });
-
-        continue;
-      }
-
-      groupIds.push(groupId);
-    }
-
-    if (groupIds.length === 0) {
-      return;
-    }
-
-    // Fetch groups
-    try {
-      const fetchedGroups = await vkApi.fetchGroups(
-        this.vkAccessToken,
-        this.clientId,
-        groupIds,
-      );
-
-      for (const data of fetchedGroups) {
-        const group = await this.getGroup(data.id);
-        await this.putGroup({
-          ...data,
-          lastCheckedDate: group?.lastCheckedDate ||
-            Date.now() / 1000 - 1000 * 60 * 60 * 24,
-          offset: group?.offset || 0,
-        });
-      }
-
-      logger.debug("updateGroups response", fetchedGroups);
-    } catch (error) {
-      this.emit(
-        "error",
-        createError({
-          code: "VK_MONITOR_UPDATE_GROUPS_ERROR",
-          cause: error instanceof Error ? error : new Error(String(error)),
-          expected: true,
-          transient: false,
-          data: {},
-        }),
-      );
-
-      logger.debug("updateGroups error", error);
-    }
-  }
-
-  private async processPost(
-    { id, text, date }: PostData,
-    groupId: number,
-  ): Promise<void> {
-    logger.debug("processPost", { id, text, date, groupId });
-
-    const storedPost = await this.getPost(id);
-    if (storedPost && storedPost.rewritten !== null) {
-      this.emit("postAlreadyProcessed", storedPost);
-      return;
-    }
-
-    this.emit("newPost", { id, text, date });
-
-    if (!this.gigachatAccessToken) {
-      await this.updateGigachatAccessToken();
-      if (!this.gigachatAccessToken) {
-        throw createError({
-          code: "GIGACHAT_API_ACCESS_TOKEN_ERROR",
-          expected: true,
-          transient: false,
-          data: {},
-        });
-      }
-    }
-
-    const rewritten = await gigaChatApi.getGigaChatRewritePost(
-      text,
-      this.messages,
-      this.clientId,
-      this.gigaChatApiKey,
-      this.gigachatAccessToken,
-    );
-
-    const post: VKGroupMonitorPost = {
-      id,
-      date,
-      groupId,
-      original: text,
-      rewritten,
-    };
-
-    await this.putPost(post);
-    this.emit("postProcessed", post);
-
-    logger.debug("processPost response", post);
-  }
-
-  private async putPost(post: VKGroupMonitorPost): Promise<void> {
-    logger.debug("putPost", post);
-
-    try {
-      await this.postsDb.put(post.id.toString(), post);
-    } catch (error) {
-      this.emit(
-        "error",
-        createError({
-          code: "VK_MONITOR_LEVEL_PUT_POST_ERROR",
-          cause: error instanceof Error ? error : new Error(String(error)),
-          expected: true,
-          transient: false,
-          data: { post },
-        }),
-      );
-
-      logger.debug("putPost error", error);
-    }
   }
 }

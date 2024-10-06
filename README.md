@@ -27,12 +27,14 @@ AI-powered text generation, and leverages LevelDB for efficient data storage.
 ## 🚀 Quick Start
 
 1. Clone the repository:
-   ```
+
+   ```bash
    git clone https://github.com/yourusername/vk-group-monitor.git
    cd vk-group-monitor
    ```
 
 2. Create a `.env` file in the project root and add your configuration:
+
    ```
    VK_ACCESS_TOKEN=your_vk_access_token
    GROUP_IDS=123456,789012
@@ -44,7 +46,8 @@ AI-powered text generation, and leverages LevelDB for efficient data storage.
    ```
 
 3. Build and run the project using Docker Compose:
-   ```
+
+   ```bash
    docker-compose up --build
    ```
 
@@ -62,22 +65,25 @@ AI-powered text generation, and leverages LevelDB for efficient data storage.
 To set up the project for development:
 
 1. Install dependencies:
-   ```
+
+   ```bash
    npm install
    ```
 
 2. Run in development mode:
-   ```
+
+   ```bash
    npm run dev
    ```
 
 3. Build the project:
-   ```
+
+   ```bash
    npm run build
    ```
 
 4. Run the built version:
-   ```
+   ```bash
    npm start
    ```
 

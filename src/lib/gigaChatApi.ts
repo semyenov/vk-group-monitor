@@ -97,11 +97,13 @@ export async function getGigaChatTokensCount(
     json.forEach((data, index) => {
       if (input[index]) {
         input[index].tokens = data.tokens;
+        input[index].characters = data.characters;
       }
     });
 
     return input.filter((item) => item.tokens > 0);
   } catch (error) {
+    logger.error("getGigaChatTokensCount error", error);
     throw createError({
       code: "GIGACHAT_API_GET_TOKENS_COUNT_ERROR",
       cause: error instanceof Error ? error : new Error(String(error)),
@@ -127,6 +129,7 @@ export async function getGigaChatRewritePost(
     gigaChatApiKey,
     gigachatAccessToken
   );
+
   const maxTokens = 120000;
   const maxCharacters = 1000000;
 

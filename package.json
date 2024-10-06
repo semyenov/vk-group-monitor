@@ -18,7 +18,7 @@
   "scripts": {
     "build": "pkgroll",
     "start": "node ./dist/cli.js",
-    "dev": "tsx watch ./src/index.ts",
+    "dev": "tsx watch ./src/cli.ts",
     "docker:build": "docker build -t vk-group-monitor .",
     "docker:run": "docker run -p 3000:3000 vk-group-monitor",
     "docker:dev": "docker run -p 3000:3000 -v $(pwd)/db:/app/db -v $(pwd)/config.yaml:/app/config.yaml vk-group-monitor",
@@ -39,7 +39,9 @@
     "level": "^8.0.1",
     "listhen": "^1.8.0",
     "module-error": "^1.0.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "pathe": "^1.1.2",
+    "unstorage": "^1.12.0"
   },
   "packageManager": "yarn@4.5.0"
 }

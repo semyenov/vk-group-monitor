@@ -6,18 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VK Group Monitor Posts</title>
 
+  <!-- Favicon -->
+  <link rel="icon" href="/favicon.ico">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Iconify -->
-  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+  <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
   <!-- Vue.js -->
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-slate-100 text-slate-700">
+<body class="font-sans bg-zinc-300 text-zinc-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-6 transition-colors duration-500 border-b rounded-b-lg shadow-xl cursor-pointer max-w-screen hover:bg-slate-800 hover:text-slate-50 bg-slate-800/95 backdrop-blur border-b-slate-400"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b rounded-b-lg shadow-lg shadow-zinc-600/40 cursor-pointer max-w-screen hover:bg-zinc-900 hover:text-zinc-50 bg-zinc-900/90 backdrop-blur border-b-zinc-900"
       @click="() => {
       fetchPosts()
       scrollToTop()
@@ -29,51 +31,66 @@
           </span>
         </div>
         <div
-          class="inline-flex items-center justify-center h-8 p-1 text-xs border rounded-full min-w-8 bg-slate-500 text-slate-50 border-slate-400 shadow-inner-md">
+          class="inline-flex items-center justify-center h-8 p-1 text-xs border rounded-full min-w-8 bg-zinc-500 text-zinc-50 border-zinc-400 shadow-inner-md">
           {{ posts.length }}
         </div>
       </div>
     </h1>
+
+
     <div class="max-w-3xl px-4 mx-auto">
-      <div class="relative mb-4 border rounded-lg shadow-md border-slate-300 bg-slate-200" v-for="post in posts"
+      <div class="relative mb-6 border rounded-lg border-zinc-600 bg-zinc-300 shadow-lg shadow-zinc-600/60" v-for="post in posts"
         :key="post.id">
         <h4
-          class="relative z-10 flex flex-row items-center justify-between px-2 py-2 text-sm transition-colors duration-500 rounded-lg cursor-pointer select-none text-slate-700 bg-slate-200 hover:text-slate-600/80"
-          @click="toggleOriginal(post)">
+          class="relative z-10 flex flex-row items-center justify-between px-4 py-2 text-sm transition-colors duration-500 rounded-t-lg cursor-pointer select-none bg-zinc-900/95 hover:bg-zinc-900 text-zinc-700 hover:text-zinc-800">
           <img
-            class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-slate-50 shadow-inner-md shadow-slate-400"
+            class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-zinc-50"
             :src="getGroup(post.groupId)?.photo_50 || ''">
-          <div class="flex flex-col items-start justify-center flex-1 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col items-start justify-center flex-1 sm:flex-row sm:items-center sm:justify-between text-zinc-50">
             <div class="flex flex-1 py-1 font-bold leading-none uppercase">
               {{ getGroup(post.groupId)?.name || post.groupId }}
             </div>
-            <div
-              class="inline-flex float-right text-xs font-semibold rounded text-nowrap sm:px-3 sm:py-1 text-slate-500 hover:text-slate-600 sm:hover:bg-slate-100 sm:bg-white sm:border sm:border-slate-300 sm:shadow-sm">
+            <div @click="toggleOriginal(post.id)"
+              class="inline-flex float-right text-xs font-semibold text-nowrap sm:px-3 sm:py-1">
               {{ formatDate(post.date) }}
             </div>
           </div>
-          </h2>
+        </h4>
 
+        <div class="z-20 px-4 py-3 text-sm border-b border-dashed shadow-md text-zinc-500 bg-zinc-300 border-b-zinc-600"
+          v-if="state.opened[post.id]">
+          <pre
+            class="font-sans italic text-zinc-600 text-xs break-words whitespace-pre-wrap text-wrap leading-1">{{ post.original }}</pre>
+        </div>
+        <div
+          class="relative z-30 px-4 py-3 leading-tight bg-zinc-200 border-b cursor-default border-b-zinc-400 text-zinc-800 rounded-b-lg shadow-md"
+        >
+          <pre
+            class="font-sans text-sm break-words whitespace-pre-wrap text-wrap">{{ post.rewritten[state.selected[post.id] !== undefined ? state.selected[post.id] : post.rewritten.length - 1] || 'Ошибка при получении текста' }}</pre>
           <div
-            class="z-20 px-4 pt-4 pb-5 -mb-1 text-sm border-t rounded-t-lg shadow-md original text-slate-500 bg-slate-100/80 border-t-slate-300"
-            v-if="post.showOriginal">
-            <p class="font-semibold text-slate-700">Оригинальный текст:</p>
-            <p class="italic break-words text-slate-500">{{ post.original }}</p>
+            class="absolute top-0 bottom-0 left-0 right-0 z-20 flex items-center justify-center leading-none transition-opacity duration-300 rounded-lg shadow copied bg-zinc-200/40 filter backdrop-blur-sm"
+            v-if="state.loading[post.id]">
+            <span
+              class="px-4 py-1 text-lg font-semibold text-center uppercase border rounded-lg shadow-sm leading-1 bg-zinc-200 border-zinc-300 text-zinc-500 bg-zinc-100">
+              Загрузка текста
+            </span>
+          </div>
+        </div>
+        <div
+          class="flex flex-row items-center justify-end text-zinc-500 bg-zinc-300 rounded-b-lg">
+          <div
+            :class="{ 'bg-zinc-700 border-zinc-400 text-zinc-50': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
+            class="inline-flex border-l border-zinc-400 py-1 px-2 cursor-pointer float-right text-xs font-semibold text-nowrap"
+            v-for="(rewrite, index) in post.rewritten" :key="index" @click="selectRewrite(post.id, index)">
+            <span class="opacity-25 font-bold">v</span>
+            <span>{{ index + 1 }}</span>
           </div>
           <div
-            class="box-border relative z-10 z-20 px-4 py-3 leading-tight bg-white border-t rounded-t-lg rounded-b-lg shadow-sm cursor-default border-t-slate-300 text-slate-700"
-            @click="copyToClipboard(post)">
-            <pre
-              class="font-sans text-sm break-words whitespace-pre-wrap text-wrap">{{ post.rewritten || 'Ошибка при получении текста' }}</pre>
-            <div
-              class="absolute top-0 bottom-0 left-0 right-0 z-20 flex items-center justify-center leading-none transition-opacity duration-300 rounded-lg shadow-lg copied bg-slate-200/40 filter backdrop-blur-sm"
-              v-if="post.copied">
-              <span
-                class="px-3 py-1 text-sm font-semibold text-center uppercase border rounded-md shadow-sm leading-1 bg-slate-200 border-slate-300 text-slate-500 bg-slate-100">
-                текст скопирован
-              </span>
-            </div>
+            class="inline-flex border-l border-zinc-400 bg-zinc-300 py-1 px-2 cursor-pointer hover:bg-zinc-300/50 float-right text-xs rounded-br-lg font-semibold text-nowrap "
+            @click="fetchRewritePost(post.id)">
+            <span class="h-4 w-4 iconify-inline text-zinc-700" data-icon="mdi:plus"></span>
           </div>
+        </div>
       </div>
     </div>
   </div>
@@ -86,6 +103,12 @@
         return {
           posts: [],
           groups: [],
+          state: {
+            loading: {},
+            opened: {},
+            selected: {},
+            position: {},
+          },
         };
       },
       methods: {
@@ -96,8 +119,29 @@
             behavior: "smooth",
           });
         },
-        toggleOriginal(post) {
-          post.showOriginal = !post.showOriginal;
+        toggleOriginal(postId) {
+          this.state.opened[postId] = !this.state.opened[postId];
+        },
+        selectRewrite(postId, index) {
+          this.state.selected[postId] = index;
+        },
+        async fetchRewritePost(postId) {
+          this.state.loading[postId] = true;
+
+          const postIndex = this.posts.findIndex((p) => p.id === postId);
+          const postResponse = await fetch(`/api/posts/${postId}/rewrite`, {
+            method: "POST",
+            headers: [
+              ["Content-Type", "application/json"],
+            ]
+          });
+
+          const post = await postResponse.json();
+          if (post.success) {
+            this.posts[postIndex] = { ...this.posts[postIndex], ...post.data };
+          }
+
+          this.state.loading[postId] = false;
         },
         async fetchPosts() {
           const postsResponse = await fetch("/api/posts");
@@ -123,22 +167,6 @@
         },
         formatDate(date) {
           return new Date(date * 1000).toLocaleString();
-        },
-        copyToClipboard(text) {
-          navigator.clipboard
-            .writeText(text)
-            .then(() => {
-              const post = this.posts.find((p) => p.rewritten === text);
-              if (post) {
-                post.copied = true;
-                setTimeout(() => {
-                  post.copied = false;
-                }, 1000);
-              }
-            })
-            .catch((err) => {
-              console.error("Failed to copy: ", err);
-            });
         },
       },
       async mounted() {

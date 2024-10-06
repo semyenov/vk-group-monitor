@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import { randomUUID } from "crypto";
-import { PostData, VKGroupMonitorGroup } from "./types";
+import { PostData, VKGroupMonitorGroup, VKGroupMonitorPost } from "./types";
 import { logger } from "./logger";
 
 export async function fetchPosts(
@@ -9,15 +9,10 @@ export async function fetchPosts(
   groupId: number,
   offset: number,
   count: number,
-): Promise<PostData[]> {
-  logger.debug(`Fetching posts for group ${groupId}`, {
-    vkAccessToken,
-    clientId,
-    offset,
-    count,
-  });
+): Promise<VKGroupMonitorPost[]> {
+  logger.debug(`Fetching posts for group ${groupId}`);
 
-  const posts: PostData[] = [];
+  const posts: VKGroupMonitorPost[] = [];
   const params = new URLSearchParams([
     ["owner_id", "-" + groupId.toString()],
     ["count", count.toString()],
@@ -31,11 +26,11 @@ export async function fetchPosts(
       `https://api.vk.com/method/wall.get?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+        ],
       },
     );
 
@@ -43,16 +38,14 @@ export async function fetchPosts(
       response?: { items: PostData[] };
     };
 
-    logger.debug(`Fetched posts for group ${groupId}`, {
-      posts: json.response?.items,
-    });
-
     for (const post of json.response?.items || []) {
-      if (post.text.length > 0 && post.text.length < 10000) {
+      if (post.text.length > 0) {
         posts.push({
           id: Number(post.id),
           date: Number(post.date),
-          text: post.text.trim(),
+          original: post.text.trim(),
+          groupId: Number(post.from_id),
+          rewritten: [],
         });
       }
     }
@@ -83,11 +76,11 @@ export async function fetchGroups(
       `https://api.vk.com/method/groups.getById?${params.toString()}`,
       {
         method: "GET",
-        headers: {
-          "X-Client-Id": clientId,
-          "X-Request-Id": randomUUID(),
-          "Content-Type": "application/json",
-        },
+        headers: [
+          ["X-Client-Id", clientId],
+          ["X-Request-Id", randomUUID()],
+          ["Content-Type", "application/json"],
+        ],
       },
     );
 
@@ -95,15 +88,13 @@ export async function fetchGroups(
       response?: Omit<VKGroupMonitorGroup, "lastCheckedDate" | "offset">[];
     };
 
-    logger.debug(`Fetched groups ${groupIds.join(",")}`, {
-      groups: json.response,
-    });
+    logger.debug(`Fetched groups ${groupIds.join(", ")}`);
 
     return json.response || [];
   } catch (error) {
-    logger.error(`Error: fetching groups ${groupIds.join(",")}`, {
+    logger.error(`Error: fetching groups ${groupIds.join(", ")}`, {
       error,
     });
-    throw new Error(`Error: fetching groups ${groupIds.join(",")}`);
+    throw new Error(`Error: fetching groups ${groupIds.join(", ")}`);
   }
 }

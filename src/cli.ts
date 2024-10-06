@@ -1,19 +1,25 @@
 #!/usr/bin/env node
 import yaml from "js-yaml";
-import fs from "fs";
-import { VKGroupMonitor, VKGroupMonitorConfig } from "./index";
+import { stat, readFile } from "node:fs/promises";
+import { join } from "pathe";
+
+import { VKGroupMonitor } from "./index";
 import {
   createApp,
   createRouter,
   defineEventHandler,
-  getRouterParam,
   serveStatic,
+  getRouterParam,
   toNodeListener,
 } from "h3";
 import { listen } from "listhen";
 import { createBasicAuthMiddleware } from "h3-basic-auth";
 
-// Get config file path from command line arguments
+import type { VKGroupMonitorConfig } from "./lib/types";
+import fs from "unstorage/drivers/fs";
+import { readFileSync } from "node:fs";
+import { createServeStaticHandler } from "./lib/static";
+
 const args = process.argv.slice(2);
 const configFilePath = args[0] || "./config.yaml";
 
@@ -24,6 +30,7 @@ const config: VKGroupMonitorConfig = {
   postsPerRequest: Number(process.env.POSTS_PER_REQUEST) || 10,
   gigachatApiKey: process.env.GIGACHAT_API_KEY || "",
   dbDir: process.env.DB_DIR || "./db",
+  publicDir: process.env.PUBLIC_DIR || "./public",
   auth: {
     username: process.env.AUTH_USERNAME || "admin",
     password: process.env.AUTH_PASSWORD || "password",
@@ -43,7 +50,7 @@ const config: VKGroupMonitorConfig = {
 
 const loadConfig = (filePath: string) => {
   try {
-    const fileContents = fs.readFileSync(filePath, "utf8");
+    const fileContents = readFileSync(filePath, "utf8");
     const data = yaml.load(fileContents) as Record<string, any>;
     for (const [key, value] of Object.entries(data)) {
       if (key in config) {
@@ -63,9 +70,12 @@ monitor.on("postProcessed", (processedPost) => {
   console.log("\n---");
   console.log("Группа:", processedPost.groupId);
   console.log("Номер поста:", processedPost.id);
-  console.log("Оригинал:\n", processedPost.original);
-  console.log("---\n");
+  console.log("Оригинал;\n----");
+  console.log(processedPost.original);
+  console.log("----\n");
+  console.log("Переписанный;\n----");
   console.log(processedPost.rewritten);
+  console.log("----\n");
 });
 
 monitor.on("error", (error: Error) => {
@@ -79,18 +89,14 @@ monitor
 const app = createApp();
 const router = createRouter();
 
-router.use(
-  "/",
-  defineEventHandler(async (event) => {
-    return fs.readFileSync("./public/index.html", "utf8");
-  }),
-);
-
 router.get(
   "/api/posts",
-  defineEventHandler(async (event) => {
+  defineEventHandler(async (_event) => {
     const posts = await monitor.getPosts();
-    return { success: true, data: posts };
+    return {
+      success: true,
+      data: posts,
+    };
   }),
 );
 
@@ -99,23 +105,62 @@ router.get(
   defineEventHandler(async (event) => {
     const postId = getRouterParam(event, "id");
     if (!postId) {
-      return { success: false, error: "Post ID is required" };
+      return {
+        success: false,
+        error: "Post ID is required",
+      };
     }
 
     const post = await monitor.getPost(Number(postId));
     if (!post) {
-      return { success: false, error: "Post not found" };
+      return {
+        success: false,
+        error: "Post not found",
+      };
     }
 
-    return { success: true, data: post };
+    return {
+      success: true,
+      data: post,
+    };
+  }),
+);
+
+router.post(
+  "/api/posts/:id/rewrite",
+  defineEventHandler(async (event) => {
+    const postId = getRouterParam(event, "id");
+    if (!postId) {
+      return {
+        success: false,
+        error: "Post ID is required",
+      };
+    }
+
+    const post = await monitor.getPost(Number(postId));
+    if (!post) {
+      return {
+        success: false,
+        error: "Post not found",
+      };
+    }
+
+    const rewrittenPost = await monitor.processPost(post);
+    return {
+      success: true,
+      data: rewrittenPost,
+    };
   }),
 );
 
 router.get(
   "/api/groups",
-  defineEventHandler(async (event) => {
+  defineEventHandler(async (_event) => {
     const groups = await monitor.getGroups();
-    return { success: true, data: groups };
+    return {
+      success: true,
+      data: groups,
+    };
   }),
 );
 
@@ -124,19 +169,29 @@ router.get(
   defineEventHandler(async (event) => {
     const groupId = getRouterParam(event, "id");
     if (!groupId) {
-      return { success: false, error: "Group ID is required" };
+      return {
+        success: false,
+        error: "Group ID is required",
+      };
     }
 
     const group = await monitor.getGroup(Number(groupId));
-    return { success: true, data: group };
+    return {
+      success: true,
+      data: group,
+    };
   }),
 );
 
 const basicAuth = createBasicAuthMiddleware(config.auth);
-app.use(basicAuth);
+const serveStaticHandler = createServeStaticHandler(config.publicDir);
+
 app.use(router);
+app.use(serveStaticHandler);
+app.use(basicAuth);
 
 listen(toNodeListener(app), {
+  hostname: "0.0.0.0",
   port: 3000,
 });
 
