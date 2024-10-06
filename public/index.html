@@ -229,7 +229,13 @@
 
           const post = await postResponse.json();
           if (post.success) {
-            this.posts[postIndex] = { ...this.posts[postIndex], ...post.data };
+            this.posts[postIndex] = {
+              ...this.posts[postIndex],
+              rewritten: [
+                this.posts[postIndex].original,
+                ...post.data.rewritten
+              ]
+            };
             this.state.selected[postId] = post.data.rewritten.length - 1;
           }
 
