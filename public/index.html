@@ -16,10 +16,10 @@
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-zinc-200 text-zinc-700">
+<body class="font-sans bg-zinc-100 text-zinc-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg rounded-b-lg shadow-zinc-400/30 cursor-pointer max-w-screen hover:text-zinc-50 bg-white/80 backdrop-blur border-b-zinc-400"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg rounded-b-lg shadow-zinc-400/20 cursor-pointer max-w-screen hover:text-zinc-50 bg-white/60 backdrop-blur border-b-zinc-300"
       @click="() => {
       fetchPosts()
       scrollToTop()
@@ -29,20 +29,20 @@
           VK Group Monitor
         </div>
         <div
-          class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-full bg-zinc-100 text-zinc-500 border-zinc-400 shadow shadow-zinc-300 font-bold">
-          <span class="px-1">{{ posts.length }}</span>
-          <span class="h-4 iconify-inline text-zinc-700" data-icon="mdi:comment-processing-outline"></span>
+          class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-lg bg-zinc-100 border-zinc-300 shadow shadow-zinc-400/20 font-bold">
+          <span class="px-1 text-zinc-600">{{ posts.length }}</span>
+          <span class="h-4 iconify-inline text-zinc-500" data-icon="mdi:comment-processing-outline"></span>
         </div>
       </div>
     </h1>
 
 
     <div class="max-w-3xl px-4 mx-auto">
-      <div class="relative mb-6 rounded-lg bg-zinc-300 shadow-lg" v-for="post in posts" :key="post.id">
+      <div class="relative mb-6 rounded-lg bg-zinc-400 shadow-lg" v-for="post in posts" :key="post.id">
 
         <!-- Original -->
         <div
-          class="z-20 border-b bg-zinc-100 border-x border-zinc-400 border-t -mb-1 rounded-t-lg shadow-lg shadow-zinc-400/40 text-zinc-600"
+          class="z-20 border-b bg-zinc-100 border-x border-zinc-300 border-t -mb-1 rounded-t-lg shadow-lg shadow-zinc-400/40 text-zinc-600"
           v-if="state.opened[post.id]">
           <div @click="toggleOriginal(post.id)"
             class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-lg font-bold leading-none">
@@ -66,7 +66,7 @@
 
         <!-- Rewrite -->
         <div
-          class="relative z-30 leading-tight bg-zinc-50 border-b cursor-default border-x border-t border-zinc-400 text-zinc-700 rounded-lg shadow-md shadow-zinc-400/20">
+          class="relative z-30 leading-tight bg-zinc-50 border-b cursor-default border-x border-t border-zinc-300 text-zinc-700 rounded-lg shadow-md shadow-zinc-400/10">
           <div v-if="!state.opened[post.id]" @click="toggleOriginal(post.id)"
             class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-lg font-bold leading-none">
             <img
@@ -97,20 +97,20 @@
 
         <!-- Footer -->
         <div
-          class="flex flex-row justify-between items-center text-zinc-500 bg-zinc-100/80 rounded-b-lg border -mt-1.5 pt-1 border-zinc-400">
-          <div class="text-xs flex items-center justify-start flex-1 pl-4 font-lighter leading-none uppercase">
+          class="flex flex-row justify-between items-center text-zinc-500 bg-zinc-100/80 rounded-b-lg border -mt-[5px] pt-1 border-zinc-300">
+          <div class="text-xs flex items-center justify-start flex-0 pl-4 font-lighter leading-none uppercase">
             <span>{{ getGroup(post.groupId)?.name || post.groupId }}</span>
           </div>
           <div class="flex flex-row items-center justify-end">
             <div
-              :class="{ 'bg-zinc-300 border-zinc-400 text-zinc-700': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
-              class="inline-flex border-l border-zinc-400 py-1 px-2 cursor-pointer float-right text-xs font-semibold text-nowrap font-bold"
+              :class="{ 'bg-zinc-300 border-zinc-300 text-zinc-700': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
+              class="inline-flex border-l border-zinc-300 py-1 px-2 cursor-pointer float-right text-xs font-semibold text-nowrap font-bold hover:bg-zinc-200"
               v-for="(rewrite, index) in post.rewritten" :key="index" @click="selectRewrite(post.id, index)">
               <span class="opacity-45">v</span>
               <span class="font-bold text-shadow-sm">{{ index + 1 }}</span>
             </div>
             <div
-              class="inline-flex border-l border-zinc-400 bg-zinc-200 py-1 px-2 cursor-pointer hover:bg-zinc-300/50 float-right text-xs rounded-br-lg font-semibold text-nowrap"
+              class="inline-flex border-l border-zinc-300 bg-zinc-200 py-1 px-2 cursor-pointer float-right text-xs rounded-br-lg font-semibold text-nowrap transition-colors duration-300 hover:text-zinc-500 hover:bg-zinc-100"
               @click="fetchRewritePost(post.id)">
               <span class="h-4 w-4 iconify-inline text-zinc-700" data-icon="mdi:plus"></span>
             </div>
