@@ -39,11 +39,10 @@
 
     <div class="max-w-3xl px-4 mx-auto">
       <div class="relative mb-6 rounded-lg shadow-lg bg-zinc-400" v-for="post in posts" :key="post.id">
-        <div
+        <div :class="{ 'max-h-36 overflow-hidden': !state.opened[post.id] }"
           class="relative z-30 leading-tight border-t border-b divide-y rounded-lg shadow-md cursor-default bg-zinc-50 border-x border-zinc-300 text-zinc-600 border-b-zinc-400/60 shadow-zinc-400/10 divide-solid">
-          <div
-            class="flex flex-row items-center justify-center px-4 py-3 font-bold leading-none cursor-pointer sm:justify-between text-md bg-zinc-300/40"
-            v-if="!state.opened[post.id]">
+          <div @click="toggleOriginal(post.id)" :class="{ 'bg-zinc-300/40': state.opened[post.id] }"
+            class="flex flex-row items-center justify-center px-4 py-2 font-bold leading-none cursor-pointer bg-zinc-100 sm:justify-between text-md">
             <img
               class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-zinc-50"
               :src="getGroup(post.groupId)?.photo_50 || ''">
@@ -55,14 +54,14 @@
                 </span>
               </div>
               <span
-                class="inline-flex text-xs font-semibold rounded sm:float-right sm:bg-zinc-100 text-zinc-500 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow sm:border sm:border-zinc-300"
-                v-if="!state.opened[post.id]">
+                class="inline-flex text-xs font-semibold rounded sm:float-right sm:bg-zinc-100 text-zinc-500 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow sm:border sm:border-zinc-300">
                 {{ formatDate(post.date) }}
               </span>
             </div>
           </div>
           <div class="flex flex-col items-center justify-center w-full divide-y divide-dashed">
-            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+            <div v-if="state.opened[post.id]"
+              class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
               <span v-if="state.selected[post.id] !== 0" class="font-bold text-zinc-600">Переписанный текст:</span>
               <span v-else class="font-bold text-zinc-600">Оригинальный текст:</span>
             </div>
@@ -71,7 +70,8 @@
           </div>
           <div v-if="post.attachments.photos.length > 0"
             class="flex flex-col items-start justify-start w-full divide-y divide-dashed">
-            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+            <div v-if="state.opened[post.id]"
+              class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
               <span class="font-bold text-zinc-600">Вложенные фото:</span>
             </div>
             <div v-for="photo in post.attachments.photos"
@@ -85,7 +85,8 @@
           </div>
           <div v-if="post.attachments.links.length > 0"
             class="flex flex-col items-center justify-center w-full divide-y divide-dashed">
-            <div class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
+            <div v-if="state.opened[post.id]"
+              class="flex flex-row items-center justify-start w-full px-4 py-2 text-sm bg-zinc-100">
               <span class="font-bold text-zinc-600">Вложенные ссылки:</span>
             </div>
             <div v-for="link in post.attachments.links"
