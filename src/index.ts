@@ -140,7 +140,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   async #fetchGroupPosts(group: VKGroupMonitorGroup): Promise<void> {
     let hasMorePosts = true;
     let lastCheckedDate = group.lastCheckedDate;
-    let offset = group.offset;
+    let offset = 0;
 
     while (hasMorePosts) {
       try {
@@ -160,12 +160,14 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         for (const post of posts) {
           if (post.date > group.lastCheckedDate) {
             await this.processPost(post);
+            console.log("offset", post.id, offset, lastCheckedDate, post.date);
             lastCheckedDate = Math.max(lastCheckedDate, post.date);
           } else {
             hasMorePosts = false;
             break;
           }
         }
+
 
         offset += posts.length;
       } catch (error) {
@@ -272,7 +274,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         await this.#putGroup({
           ...data,
           lastCheckedDate: group?.lastCheckedDate ||
-            Date.now() / 1000 - 60 * 60 * 24,
+            Date.now() / 1000 - 60 * 60 * 24 * 5,
           offset: group?.offset || 0,
         });
       }

@@ -39,16 +39,19 @@ export async function fetchPosts(
     };
 
     for (const post of json.response?.items || []) {
+      const original = post.text.trim()
       if (post.text.length > 0) {
         posts.push({
           id: Number(post.id),
           date: Number(post.date),
-          original: post.text.trim(),
-          groupId: Number(post.from_id),
+          groupId,
+          original,
           rewritten: [],
         });
       }
     }
+
+    console.log("Posts", posts.length, posts);
 
     return posts;
   } catch (error) {
