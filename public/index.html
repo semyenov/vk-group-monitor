@@ -16,10 +16,10 @@
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-zinc-100 text-zinc-700">
+<body class="font-sans bg-zinc-200 text-zinc-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 pt-3 pb-2 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg shadow-zinc-400/30 cursor-pointer max-w-screen hover:text-zinc-50 bg-white/80 backdrop-blur border-b-zinc-400"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg rounded-b-lg shadow-zinc-400/30 cursor-pointer max-w-screen hover:text-zinc-50 bg-white/80 backdrop-blur border-b-zinc-400"
       @click="() => {
       fetchPosts()
       scrollToTop()
@@ -29,7 +29,7 @@
           VK Group Monitor
         </div>
         <div
-          class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-full bg-zinc-100 text-zinc-500 border-zinc-400 shadow shadow-zinc-400 font-bold">
+          class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-full bg-zinc-100 text-zinc-500 border-zinc-400 shadow shadow-zinc-300 font-bold">
           <span class="px-1">{{ posts.length }}</span>
           <span class="h-4 iconify-inline text-zinc-700" data-icon="mdi:comment-processing-outline"></span>
         </div>
@@ -97,7 +97,7 @@
 
         <!-- Footer -->
         <div
-          class="flex flex-row justify-between items-center text-zinc-500 bg-zinc-100/80 rounded-b-lg border -mt-1 pt-1 border-zinc-400">
+          class="flex flex-row justify-between items-center text-zinc-500 bg-zinc-100/80 rounded-b-lg border -mt-1.5 pt-1 border-zinc-400">
           <div class="text-xs flex items-center justify-start flex-1 pl-4 font-lighter leading-none uppercase">
             <span>{{ getGroup(post.groupId)?.name || post.groupId }}</span>
           </div>
