@@ -25,8 +25,9 @@
       scrollToTop()
     }">
       <div class="flex flex-row items-center justify-between flex-1 max-w-3xl px-4 mx-auto">
-        <div class="inline-flex flex-row h-full mr-4 text-2xl font-bold text-zinc-900/80">
-          VK Group Monitor
+        <div class="inline-flex flex-row h-full mr-4 text-2xl font-bold text-zinc-600">
+          <span class="h-8 w-8 mr-2 iconify-inline" data-icon="ion:logo-vk"></span>
+          <span class="">Group Monitor</span>
         </div>
         <div
           class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-lg bg-zinc-100 border-zinc-300 shadow shadow-zinc-400/20 font-bold">
@@ -36,7 +37,6 @@
       </div>
     </h1>
 
-
     <div class="max-w-3xl px-4 mx-auto">
       <div class="relative mb-6 rounded-lg bg-zinc-400 shadow-lg" v-for="post in posts" :key="post.id">
 
@@ -45,7 +45,7 @@
           class="z-20 border-b bg-zinc-100 border-x border-zinc-300 border-t -mb-1 rounded-t-lg shadow-lg shadow-zinc-400/40 text-zinc-600"
           v-if="state.opened[post.id]">
           <div @click="toggleOriginal(post.id)"
-            class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-lg font-bold leading-none">
+            class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-md font-bold leading-none">
             <img
               class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-zinc-50"
               :src="getGroup(post.groupId)?.photo_50 || ''">
@@ -55,7 +55,7 @@
                 {{ getGroup(post.groupId)?.name || post.groupId }}
               </span>
               <span
-                class="inline-flex sm:float-right text-xs font-semibold sm:bg-zinc-200 text-zinc-600 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow-md rounded sm:border sm:border-zinc-400 cursor-pointer">
+                class="inline-flex sm:float-right text-xs font-semibold sm:bg-zinc-100 text-zinc-500 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow rounded sm:border sm:border-zinc-300 cursor-pointer">
                 {{ formatDate(post.date) }}
               </span>
             </div>
@@ -66,9 +66,9 @@
 
         <!-- Rewrite -->
         <div
-          class="relative z-30 leading-tight bg-zinc-50 border-b cursor-default border-x border-t border-zinc-300 text-zinc-700 rounded-lg shadow-md shadow-zinc-400/10">
+          class="relative z-30 leading-tight bg-zinc-50 border-b cursor-default border-x border-t border-zinc-300 text-zinc-600 rounded-lg shadow-md border-b-zinc-400/60 shadow-zinc-400/10">
           <div v-if="!state.opened[post.id]" @click="toggleOriginal(post.id)"
-            class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-lg font-bold leading-none">
+            class="py-3 px-4 cursor-pointer flex flex-row items-center justify-center sm:justify-between text-md font-bold leading-none">
             <img
               class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-zinc-50"
               :src="getGroup(post.groupId)?.photo_50 || ''">
@@ -78,7 +78,7 @@
                 {{ getGroup(post.groupId)?.name || post.groupId }}
               </span>
               <span v-if="!state.opened[post.id]"
-                class="inline-flex sm:float-right text-xs font-semibold sm:bg-zinc-200 text-zinc-600 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow-md rounded sm:border sm:border-zinc-400">
+                class="inline-flex sm:float-right text-xs font-semibold sm:bg-zinc-100 text-zinc-500 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow rounded sm:border sm:border-zinc-300">
                 {{ formatDate(post.date) }}
               </span>
             </div>
@@ -101,18 +101,18 @@
           <div class="text-xs flex items-center justify-start flex-0 pl-4 font-lighter leading-none uppercase">
             <span>{{ getGroup(post.groupId)?.name || post.groupId }}</span>
           </div>
-          <div class="flex flex-row items-center justify-end">
+          <div class="flex flex-row justify-center items-stretch">
             <div
-              :class="{ 'bg-zinc-300 border-zinc-300 text-zinc-700': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
-              class="inline-flex border-l border-zinc-300 py-1 px-2 cursor-pointer float-right text-xs font-semibold text-nowrap font-bold hover:bg-zinc-200"
+              :class="{ 'bg-zinc-300 border-zinc-300': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
+              class="inline-flex border-l border-zinc-300 py-2 px-2 cursor-pointer float-right text-xs font-semibold text-nowrap transition-colors duration-300 font-bold hover:bg-zinc-100/40"
               v-for="(rewrite, index) in post.rewritten" :key="index" @click="selectRewrite(post.id, index)">
               <span class="opacity-45">v</span>
               <span class="font-bold text-shadow-sm">{{ index + 1 }}</span>
             </div>
             <div
-              class="inline-flex border-l border-zinc-300 bg-zinc-200 py-1 px-2 cursor-pointer float-right text-xs rounded-br-lg font-semibold text-nowrap transition-colors duration-300 hover:text-zinc-500 hover:bg-zinc-100"
+              class="inline-flex items-center justify-center border-l border-zinc-300 bg-zinc-200 px-2 cursor-pointer rounded-br-lg font-semibold text-nowrap transition-colors duration-300 text-green-600 hover:text-green-500 hover:bg-zinc-100/40"
               @click="fetchRewritePost(post.id)">
-              <span class="h-4 w-4 iconify-inline text-zinc-700" data-icon="mdi:plus"></span>
+              <span class="h-5 w-5 iconify-inline" data-icon="ion:load-d"></span>
             </div>
           </div>
         </div>
