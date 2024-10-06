@@ -16,63 +16,29 @@
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
 </head>
 
-<body class="font-sans bg-zinc-50 text-zinc-700">
+<body class="font-sans bg-zinc-100 text-zinc-700">
   <div id="app">
     <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b rounded-b-lg shadow-lg cursor-pointer shadow-zinc-400/20 max-w-screen hover:text-zinc-50 bg-zinc-200/95 backdrop-blur border-b-zinc-300"
+      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b rounded-b-lg shadow-lg cursor-pointer shadow-zinc-400/20 max-w-screen hover:text-zinc-50 bg-zinc-200/95 backdrop-blur border-b-zinc-400/40"
       @click="() => {
       fetchPosts()
       scrollToTop()
     }">
       <div class="flex flex-row items-center justify-between flex-1 max-w-3xl px-4 mx-auto">
-        <div class="inline-flex flex-row h-full mr-4 text-2xl font-bold text-zinc-600">
+        <div class="inline-flex flex-row items-center justify-center h-full mr-4 text-2xl font-bold text-zinc-600">
           <span class="w-8 h-8 mr-2 iconify-inline" data-icon="ion:logo-vk"></span>
           <span class>Group Monitor</span>
         </div>
         <div
-          class="inline-flex items-center justify-center py-0.5 px-2 box-content text-md border leading-0 rounded-lg bg-zinc-100 border-zinc-300 shadow shadow-zinc-400/20 font-bold">
-          <span class="px-1 text-zinc-600">{{ posts.length }}</span>
-          <span class="h-4 iconify-inline text-zinc-500" data-icon="mdi:comment-processing-outline"></span>
+          class="inline-flex items-center justify-center py-0.5 px-2 box-content border leading-0 rounded-lg bg-zinc-500 border-zinc-300 shadow shadow-zinc-400/20 font-bold">
+          <span class="px-1 text-md text-zinc-50">{{ posts.length }}</span>
+          <span class="w-4 h-4 iconify-inline text-zinc-200" data-icon="ion:newspaper-sharp"></span>
         </div>
       </div>
     </h1>
 
     <div class="max-w-3xl px-4 mx-auto">
       <div class="relative mb-6 rounded-lg shadow-lg bg-zinc-400" v-for="post in posts" :key="post.id">
-
-        <!-- Original
-        <div
-          class="z-20 -mb-1 border-t border-b rounded-t-lg shadow-lg bg-zinc-100 border-x border-zinc-300 shadow-zinc-400/40 text-zinc-600"
-          v-if="state.opened[post.id]">
-          <div
-            class="flex flex-row items-center justify-center px-4 py-3 font-bold leading-none cursor-pointer sm:justify-between text-md"
-            @click="toggleOriginal(post.id)">
-            <img
-              class="flex self-center w-auto mr-2 border-2 rounded-full shadow max-w-12 max-h-12 sm:max-w-6 sm:max-h-6 border-zinc-50"
-              :src="getGroup(post.groupId)?.photo_50 || ''">
-            <div class="flex flex-col items-start justify-start flex-1 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex flex-row items-center justify-start">
-                <span class="inline-flex my-1 uppercase sm:my-0">
-                  {{ getGroup(post.groupId)?.name || post.groupId }}
-                </span>
-                <span class="inline-flex items-center justify-start px-3 leading-none uppercase flex-0 font-lighter"
-                  v-if="post.attachments.photos.length > 0 || post.attachments.links.length > 0">
-                  <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:attachment"></span>
-                  <span>{{ post.attachments.links.length +
-                    post.attachments.photos.length }}</span>
-                </span>
-              </div>
-              <span
-                class="inline-flex text-xs font-semibold rounded cursor-pointer sm:float-right sm:bg-zinc-100 text-zinc-500 text-nowrap sm:px-2 sm:py-1 sm:mb-1 sm:ml-2 sm:shadow sm:border sm:border-zinc-300">
-                {{ formatDate(post.date) }}
-              </span>
-            </div>
-          </div>
-          <pre
-            class="px-4 pt-0 pb-6 text-xs italic break-words whitespace-pre-wrap text-zinc-600 text-wrap leading-1">{{ post.original }}</pre>
-        </div> -->
-
-        <!-- Rewrite -->
         <div
           class="relative z-30 leading-tight border-t border-b divide-y rounded-lg shadow-md cursor-default bg-zinc-50 border-x border-zinc-300 text-zinc-600 border-b-zinc-400/60 shadow-zinc-400/10 divide-solid">
           <div
@@ -86,12 +52,6 @@
               <div class="flex flex-row items-center justify-start">
                 <span class="inline-flex my-1 uppercase sm:my-0">
                   {{ getGroup(post.groupId)?.name || post.groupId }}
-                </span>
-                <span class="inline-flex items-center justify-start px-3 leading-none uppercase flex-0 font-lighter"
-                  v-if="post.attachments.photos.length > 0 || post.attachments.links.length > 0">
-                  <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:attachment"></span>
-                  <span>{{ post.attachments.links.length +
-                    post.attachments.photos.length }}</span>
                 </span>
               </div>
               <span
@@ -150,21 +110,24 @@
         <!-- Footer -->
         <div
           class="flex flex-row justify-between items-center text-zinc-500 bg-zinc-100/80 rounded-b-lg border -mt-[5px] pt-1 border-zinc-300">
-          <div class="flex flex-row">
-            <div
-              class="flex items-center justify-start pl-4 pr-3 text-xs leading-none uppercase border-r border-dashed border-zinc-400 flex-0 font-lighter">
+          <div class="flex flex-row divide-x divide-zinc-400 divide-dashed">
+            <div class="flex items-center justify-start pl-4 pr-3 text-xs leading-none uppercase flex-0 font-lighter">
               <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:heart-outline"></span>
               <span>{{ post.likesCount }}</span>
             </div>
-            <div
-              class="flex items-center justify-start px-3 text-xs leading-none uppercase border-r border-dashed flex-0 border-zinc-400 font-lighter">
+            <div class="flex items-center justify-start px-3 text-xs leading-none uppercase flex-0 font-lighter">
               <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:share-outline"></span>
               <span>{{ post.repostsCount }}</span>
             </div>
-            <div
-              class="flex items-center justify-start px-3 text-xs leading-none uppercase border-r border-dashed flex-0 border-zinc-400 font-lighter">
+            <div class="flex items-center justify-start px-3 text-xs leading-none uppercase flex-0 font-lighter">
               <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:eye-outline"></span>
               <span>{{ post.viewsCount }}</span>
+            </div>
+            <div class="inline-flex items-center justify-start px-3 leading-none uppercase flex-0 font-lighter"
+              v-if="post.attachments.photos.length > 0 || post.attachments.links.length > 0">
+              <span class="w-4 h-4 mr-1 iconify-inline text-zinc-500" data-icon="mdi:attachment"></span>
+              <span>{{ post.attachments.links.length +
+                post.attachments.photos.length }}</span>
             </div>
           </div>
           <div class="flex flex-row items-stretch justify-center">
