@@ -3,7 +3,6 @@ import type { Config } from 'tailwindcss'
 import aspectRatio from '@tailwindcss/aspect-ratio'
 import containerQueries from '@tailwindcss/container-queries'
 import forms from '@tailwindcss/forms'
-import lineClamp from '@tailwindcss/line-clamp'
 import typography from '@tailwindcss/typography'
 
 const config: Config = {
@@ -38,7 +37,6 @@ const config: Config = {
     }),
     aspectRatio,
     containerQueries,
-    lineClamp,
   ],
 }
 

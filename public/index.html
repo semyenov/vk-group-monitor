@@ -64,7 +64,7 @@
     //** @type {import('vue').Component} */
     const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
     const { createPinia, defineStore } = Pinia;
-    const { useToggle } = VueUse;
+    const { useToggle, onLongPress } = VueUse;
     var {
       OverlayScrollbars,
       ScrollbarsHidingPlugin,
@@ -114,6 +114,23 @@
           failed: failed.value,
         }));
 
+        function onLongPressCallbackHook(e) {
+          toggleScrollable(true)
+        }
+        function resetHook() {
+          toggleScrollable(false)
+        }
+
+        onLongPress(
+          content,
+          onLongPressCallbackHook,
+          {
+            modifiers: {
+              prevent: true
+            }
+          }
+        )
+
         watch(scrollable, (s) => {
           if (s) {
             if (content.value) {
@@ -144,6 +161,7 @@
           selected,
           toggleOpened,
           toggleScrollable,
+          resetHook,
           setSelectedIndex,
           fetchRewritePost: async (postId) => {
             toggleLoading(true);
@@ -171,8 +189,7 @@
           >
             <div
               ref="content"
-              @mouseenter="toggleScrollable(true)"
-              @mouseleave="toggleScrollable(false)"
+              @mouseleave="resetHook"
               class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
               :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
             >
