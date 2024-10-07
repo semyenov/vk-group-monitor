@@ -27,14 +27,14 @@
     }">
       <div class="mx-auto flex max-w-3xl flex-1 flex-row items-center justify-between px-4">
         <div
-          class="drop-shadow-zinc-100 mr-4 inline-flex h-full flex-row items-stretch justify-center text-xl font-bold leading-none text-zinc-50 drop-shadow-xl">
+          class="drop-shadow-zinc-100 mr-4 inline-flex h-full flex-row items-stretch justify-center text-lg font-bold leading-none text-zinc-50 drop-shadow-xl">
           <iconify-icon class="mr-2 inline-flex h-full text-zinc-200" icon="ion:logo-vk"></iconify-icon>
           <span class="text-zinc-50">Group Monitor</span>
         </div>
         <div
-          class="box-content inline-flex items-center justify-center rounded-md border border-zinc-500 bg-zinc-700 px-1 py-0.5 font-bold leading-none shadow shadow-zinc-800/20 transition-colors duration-300 hover:border-zinc-500/80 hover:bg-zinc-800">
+          class="inline-flex items-center justify-center rounded-md border border-zinc-500 bg-zinc-700 px-1 py-1 text-sm font-bold leading-none shadow shadow-zinc-800/20 transition-colors duration-300 hover:border-zinc-500/80 hover:bg-zinc-800">
           <span class="mx-1 text-zinc-100">{{ posts.length }}</span>
-          <iconify-icon class="inline-flex text-zinc-300/90" icon="ion:newspaper-sharp"></iconify-icon>
+          <iconify-icon class="inline-flex text-zinc-100/80" icon="ion:newspaper-sharp"></iconify-icon>
         </div>
       </div>
     </h1>
@@ -43,7 +43,7 @@
       <div class="relative mb-6 rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20" v-for="post in posts"
         :key="post.id">
         <div :class="{ 'max-h-36 overflow-hidden': !state.opened[post.id] }"
-          class="relative z-30 cursor-default divide-y divide-dashed divide-zinc-400/40 rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 pb-4 leading-tight text-zinc-600 shadow-inner shadow-lg shadow-zinc-300/60">
+          class="relative z-30 cursor-default divide-y divide-dashed divide-zinc-400/20 rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 pb-4 leading-tight text-zinc-600 shadow-inner shadow-lg shadow-zinc-300/60">
           <div @click="toggleOriginal(post.id)"
             class="text-md flex cursor-pointer flex-row items-center justify-center rounded-t-lg bg-zinc-100 px-4 py-2 font-bold leading-none sm:justify-between">
             <img
@@ -101,10 +101,10 @@
 
           </div>
           <div
-            class="copied absolute bottom-0 left-0 right-0 top-0 z-20 flex items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-sm transition-opacity duration-300"
+            class="absolute bottom-0 left-0 right-0 top-0 z-20 flex items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-sm transition-opacity duration-300"
             v-if="state.loading[post.id]">
             <span
-              class="rounded border border-zinc-300 bg-zinc-50 px-4 py-2 text-center text-lg font-semibold uppercase leading-none text-zinc-500 shadow-md">
+              class="rounded border border-zinc-200 bg-zinc-50 px-4 py-2 text-center text-lg font-semibold uppercase leading-none text-zinc-500 shadow-md">
               Генерация текста
             </span>
           </div>
