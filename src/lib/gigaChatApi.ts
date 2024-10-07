@@ -1,15 +1,15 @@
-import fetch, { FetchError } from "node-fetch";
-import { randomUUID } from "crypto";
-import { httpsAgent } from "./httpAgent";
 import { createConsola } from "consola";
+import { randomUUID } from "crypto";
+import fetch, { FetchError } from "node-fetch";
 import { createError } from "./errors";
+import { httpsAgent } from "./httpAgent";
 
 const logger = createConsola({ defaults: { tag: "GigaChatApi" } });
 
 export async function updateGigachatAccessToken(
   gigaChatApiKey: string,
 ): Promise<string | null> {
-  logger.debug("updateGigachatAccessToken");
+  logger.debug("updateGigachatAccessToken");  
 
   try {
     const response = await fetch(

@@ -62,10 +62,27 @@
 
   <script>
     //** @type {import('vue').Component} */
-    const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
-    const { createPinia, defineStore } = Pinia;
-    const { useToggle, onLongPress, useActiveElement, useScrollLock } = VueUse;
-    var {
+    const {
+      createApp,
+      defineComponent,
+      ref,
+      toRef,
+      computed,
+      watch
+    } = Vue;
+    const {
+      createPinia,
+      defineStore
+    } = Pinia;
+    const {
+      useToggle,
+      onLongPress,
+      useScrollLock,
+      useWindowScroll,
+      TransitionPresets,
+      useTransition,
+    } = VueUse;
+    const {
       OverlayScrollbars,
       ScrollbarsHidingPlugin,
       SizeObserverPlugin,
@@ -104,13 +121,9 @@
         );
 
         const failed = computed(() => typeof selected.value === "string");
-        const activeElement = useActiveElement();
-        const scrollable = useScrollLock(content);
 
-        watch(activeElement, (a) => {
-          console.log(a.isSameNode(content.value), a, content.value)
-          toggleScrollable(a.isSameNode(content.value))
-        })
+        const { x, y } = useWindowScroll();
+        const scrollable = useScrollLock(content);
 
         const state = computed(() => ({
           loading: loading.value,
@@ -120,16 +133,16 @@
           failed: failed.value,
         }));
 
-        function onLongPressCallbackHook(e) {
+        function scrollableHook(e) {
           scrollable.value = true
         }
-        function resetHook() {
+        function resetScrollableHook() {
           scrollable.value = false
         }
 
         onLongPress(
           content,
-          onLongPressCallbackHook,
+          scrollableHook,
           {
             delay: 200,
             modifiers: {
@@ -141,20 +154,21 @@
 
         watch(scrollable, (s) => {
           if (s) {
-            if (content.value) {
-              content.value.style.overflowY = "auto";
-              overlayscrollbars.value = new OverlayScrollbars(content.value, {
-                plugins: [
-                  ScrollbarsHidingPlugin,
-                  ClickScrollPlugin,
-                ],
-              });
-            }
-          } else if (overlayscrollbars.value) {
-            overlayscrollbars.value.destroy();
-            if (content.value) {
-              content.value.style.overflowY = "hidden";
-            }
+            scrollableHook()
+            overlayscrollbars.value = new OverlayScrollbars(content.value, {
+              plugins: [
+                ScrollbarsHidingPlugin,
+                ClickScrollPlugin,
+                SizeObserverPlugin,
+              ],
+              scrollbars: {
+                autoHide: "never",
+              },
+            });
+          } else {
+            overlayscrollbars.value?.destroy();
+            overlayscrollbars.value = null;
+            resetScrollableHook()
           }
         });
 
@@ -167,9 +181,8 @@
           content,
           selected,
           toggleOpened,
-          toggleScrollable,
-          resetHook,
           setSelectedIndex,
+          resetScrollableHook,
           fetchRewritePost: async (postId) => {
             toggleLoading(true);
             await postsStore.fetchRewritePost(postId);
@@ -196,7 +209,9 @@
           >
             <div
               ref="content"
-              @mouseleave="resetHook"
+              @mouseleave="resetScrollableHook"
+              @blur="resetScrollableHook"
+              @click="resetScrollableHook"
               class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
               :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
             >
