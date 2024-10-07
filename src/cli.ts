@@ -1,23 +1,19 @@
 #!/usr/bin/env node
-import yaml from "js-yaml";
-import { readFile, stat } from "node:fs/promises";
-import { join } from "pathe";
-
-import { VKGroupMonitor } from "./index";
 import {
   createApp,
   createRouter,
   defineEventHandler,
   getRouterParam,
-  serveStatic,
-  toNodeListener,
+  toNodeListener
 } from "h3";
-import { listen } from "listhen";
 import { createBasicAuthMiddleware } from "h3-basic-auth";
+import yaml from "js-yaml";
+import { listen } from "listhen";
+import { VKGroupMonitor } from "./index";
 
-import type { VKGroupMonitorConfig } from "./lib/types";
 import { readFileSync } from "node:fs";
 import { createServeStaticHandler } from "./lib/static";
+import type { VKGroupMonitorConfig } from "./lib/types";
 
 const args = process.argv.slice(2);
 const configFilePath = args[0] || "./config.yaml";

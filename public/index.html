@@ -79,6 +79,7 @@
       onLongPress,
       useScrollLock,
       useWindowScroll,
+      useElementBounding,
       TransitionPresets,
       useTransition,
     } = VueUse;
@@ -115,7 +116,7 @@
         const [loading, toggleLoading] = useToggle(false);
 
         const selectedIndex = ref(post.value.rewritten.length - 1);
-        const setSelectedIndex = (index) => (selectedIndex.value = index);
+
         const selected = computed(
           () => post.value.rewritten[selectedIndex.value]
         );
@@ -124,6 +125,15 @@
 
         const { x, y } = useWindowScroll();
         const scrollable = useScrollLock(content);
+
+        const setSelectedIndex = (index) => {
+          selectedIndex.value = index;
+          // const { y: contentRectY, top: contentRectTop } = useElementBounding(content);
+          // window.scrollTo({
+          //   top: contentRectTop,
+          //   behavior: "smooth",
+          // });
+        };
 
         const state = computed(() => ({
           loading: loading.value,
@@ -225,30 +235,7 @@
                   Генерирую текст
                 </span>
               </div>
-              <div
-                v-if="group"
-                @click="() => toggleOpened()"
-                class="z-30 flex cursor-pointer flex-row items-center justify-center rounded-t-lg border-b bg-zinc-100 px-4 py-1 font-bold leading-none sm:justify-between"
-              >
-                <img
-                  class="max-w-10 mr-3 flex max-h-10 w-auto self-center rounded-full border-2 border-zinc-50 shadow sm:max-h-6 sm:max-w-6"
-                  :src="group.photo_50 || ''"
-                />
-                <div
-                  class="flex flex-1 flex-col items-start justify-between py-1 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div class="flex flex-row items-center justify-start">
-                    <span class="inline-flex uppercase text-lg">
-                      {{ group.name || group.id }}
-                    </span>
-                  </div>
-                  <span
-                    class="text-nowrap inline-flex rounded border-dashed text-xs text-zinc-500 sm:mb-1 sm:border sm:border-zinc-200 sm:bg-zinc-50 sm:px-2 sm:py-1 sm:shadow-sm"
-                  >
-                    {{ formatDate(post.date) }}
-                  </span>
-                </div>
-              </div>
+              
               <div
                 class="flex w-full flex-col items-center justify-center divide-y divide-dashed divide-zinc-200"
               >
