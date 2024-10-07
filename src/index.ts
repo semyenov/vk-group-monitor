@@ -1,22 +1,22 @@
-import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import { EventEmitter } from "events";
 import { FetchError } from "node-fetch";
 import { createStorage, type Storage } from "unstorage";
 import fsDriver from "unstorage/drivers/fs";
 import { createError, ErrorCode } from "./lib/errors";
 import { logger } from "./lib/logger";
 
-import * as vkApi from "./lib/vkApi";
 import * as gigaChatApi from "./lib/gigaChatApi";
+import * as vkApi from "./lib/vkApi";
 
+import { Post, validatePost } from "./lib/ajv";
+import { repairJson } from "./lib/jsonrepare";
 import type {
   VKGroupMonitorConfig,
   VKGroupMonitorEvents,
   VKGroupMonitorGroup,
   VKGroupMonitorPost,
 } from "./lib/types";
-import { Post, validatePost } from "./lib/ajv";
-import { repairJson } from "./lib/jsonrepare";
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   // Private fields
@@ -296,7 +296,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         cause: error instanceof Error ? error : new Error(String(error)),
         expected: true,
         transient: false,
-        data,
+        data: data as Record<string, unknown>,
       }),
     );
     logger.debug(`${code} error`, error);
