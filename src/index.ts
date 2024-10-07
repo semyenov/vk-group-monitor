@@ -299,7 +299,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         data: data as Record<string, unknown>,
       }),
     );
-    logger.debug(`${code} error`, error);
+    logger.error(`${code} error`, error);
   }
 
   async #updateGroups(): Promise<void> {
@@ -349,7 +349,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         }),
       );
 
-      logger.debug("updateGroups error", error);
+      logger.error("updateGroups error", error);
     }
   }
 
@@ -398,7 +398,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
           }),
         );
 
-        logger.debug("getPost error", error);
+        logger.error("getPost error", error);
       }
 
       return null;
@@ -445,15 +445,15 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         );
       }
 
-      logger.debug("getGroup error", error);
+      logger.error("getGroup error", error);
 
       return null;
     }
   }
 
-  validatePost(data: string): Post | string {
+  validatePost(json: string): Post | string {
     try {
-      const post = repairJson(data);
+      const post = repairJson(json);
       const isValid = validatePost(post);
 
       if (!isValid) {
@@ -467,11 +467,11 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
         code: "POST_VALIDATION_ERROR",
         error,
         data: {
-          data,
+          json,
         },
       });
 
-      return data;
+      return json;
     }
   }
 

@@ -100,7 +100,6 @@
 
         const selectedIndex = ref(post.value.rewritten.length - 1);
         const setSelectedIndex = (index) => (selectedIndex.value = index);
-
         const selected = computed(
           () => post.value.rewritten[selectedIndex.value]
         );
@@ -117,47 +116,20 @@
 
         watch(scrollable, (s) => {
           if (s) {
-            if (overlayscrollbars.value) {
-              overlayscrollbars.value.destroy();
-            }
             if (content.value) {
-              content.value.style.overflow = "auto";
+              content.value.style.overflowY = "auto";
+              overlayscrollbars.value = new OverlayScrollbars(content.value, {
+                plugins: [
+                  ScrollbarsHidingPlugin,
+                  SizeObserverPlugin,
+                  ClickScrollPlugin,
+                ],
+              });
             }
-            overlayscrollbars.value = new OverlayScrollbars(content.value, {
-              plugins: [
-                ScrollbarsHidingPlugin,
-                SizeObserverPlugin,
-                ClickScrollPlugin,
-              ],
-            });
           } else if (overlayscrollbars.value) {
             overlayscrollbars.value.destroy();
             if (content.value) {
-              content.value.style.overflow = "hidden";
-            }
-          }
-        });
-
-        watch(loading, (l) => {
-          if (overlayscrollbars.value) {
-            if (l) {
-              overlayscrollbars.value.destroy();
-              if (content.value) {
-                content.value.style.overflow = "hidden";
-              }
-            } else {
-              if (content.value) {
-                content.value.style.overflow = "auto";
-                overlayscrollbars.value = new OverlayScrollbars(content.value, {
-                  plugins: [
-                    ScrollbarsHidingPlugin,
-                    SizeObserverPlugin,
-                    ClickScrollPlugin,
-                  ],
-                });
-
-                console.log(overlayscrollbars.value);
-              }
+              content.value.style.overflowY = "hidden";
             }
           }
         });
@@ -202,7 +174,7 @@
               @mouseenter="toggleScrollable(true)"
               @mouseleave="toggleScrollable(false)"
               class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
-              :class="{ 'max-h-48': !state.opened, 'max-h-96': state.opened && state.loading }"
+              :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
             >
               <div
                 class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
@@ -217,17 +189,17 @@
               <div
                 v-if="group"
                 @click="() => toggleOpened()"
-                class="text-md z-30 flex cursor-pointer flex-row items-center justify-center rounded-t-lg border-b bg-zinc-100 px-4 py-1 font-bold leading-none sm:justify-between"
+                class="z-30 flex cursor-pointer flex-row items-center justify-center rounded-t-lg border-b bg-zinc-100 px-4 py-1 font-bold leading-none sm:justify-between"
               >
                 <img
-                  class="max-w-12 sm:max-w-6 mr-3 flex max-h-12 w-auto self-center rounded-full border-2 border-zinc-50 shadow sm:max-h-6"
+                  class="max-w-10 mr-3 flex max-h-10 w-auto self-center rounded-full border-2 border-zinc-50 shadow sm:max-h-6 sm:max-w-6"
                   :src="group.photo_50 || ''"
                 />
                 <div
                   class="flex flex-1 flex-col items-start justify-between py-1 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div class="flex text-lg flex-row items-center justify-start">
-                    <span class="inline-flex uppercase">
+                  <div class="flex flex-row items-center justify-start">
+                    <span class="inline-flex uppercase text-lg">
                       {{ group.name || group.id }}
                     </span>
                   </div>
@@ -256,7 +228,7 @@
                 <div v-if="typeof selected === 'string'" class="flex flex-1 flex-col w-full items-start justify-start gap-4 px-4 py-2">
                   <span class="text-zinc-600">{{ selected }}</span>
                 </div>
-                <div class="flex flex-1 flex-col break-all w-full items-start justify-start gap-4 px-4 py-2">
+                <div class="flex flex-1 flex-col break-words w-full items-start justify-start gap-4 px-4 py-2">
                   <div v-if="selected.title" class="flex flex-col items-start justify-start gap-1">
                     <!-- <span class="text-xs font-bold text-zinc-500">Заголовок:</span>  -->
                     <h4 class="mb-0 flex flex-col items-start text-lg font-semibold leading-tight text-zinc-600">
@@ -296,7 +268,7 @@
                   <div v-if="selected.source_link" class="flex flex-col items-start justify-start gap-1">
                     <span class="text-xs font-bold text-zinc-500">Ссылка:</span>
                     <div class="flex flex-col items-start justify-start">
-                      <a target="_blank" :href="selected.source_link" class="text-zinc-600">{{ selected.source_link }}</a>
+                      <a target="_blank" :href="selected.source_link" class="break-all text-zinc-600">{{ selected.source_link }}</a>
                     </div>
                   </div>
                 </div>
@@ -322,7 +294,7 @@
                       class="iconify-inline text-zinc-500"
                       data-icon="mdi:image-multiple"
                     ></span>
-                    <a target="_blank" :href="photo.url" class="text-zinc-600"
+                    <a target="_blank" :href="photo.url" class="break-all text-zinc-600"
                       >{{ photo.text || photo.id }}</a
                     >
                   </span>
@@ -347,7 +319,7 @@
                     class="iconify-inline text-zinc-500"
                     data-icon="mdi:link"
                   ></span>
-                  <span class="text-zinc-600">
+                  <span class="break-all text-zinc-600">
                     {{ link.title || link.url }}
                   </span>
                 </a>
@@ -404,7 +376,7 @@
               <div
                 class="right-0 flex h-full w-full flex-1 flex-row content-stretch items-stretch justify-end overflow-hidden"
               >
-                <div
+                <button
                   class="text-nowrap flex cursor-pointer items-center border-l border-zinc-300 px-2 pb-1 pt-1.5 font-semibold transition-colors duration-300 hover:bg-zinc-100/40"
                   :class="{ 'bg-zinc-200 border-zinc-300': state.selected !== undefined ? state.selected === index : index === post.rewritten.length - 1 }"
                   v-for="(rewrite, index) in post.rewritten"
@@ -413,17 +385,18 @@
                 >
                   <span class="opacity-45">v</span>
                   <span class="text-shadow=sm font-bold">{{ index }}</span>
-                </div>
-                <div
+                </button>
+                <button
                   class="text-nowrap flex cursor-pointer items-center justify-center rounded-br-lg border-l border-zinc-300 px-2 pb-1 pt-2 font-bold transition-colors duration-300 hover:bg-zinc-50"
                   :class="{ 'text-green-500': !state.failed, 'text-red-500': state.failed }"
+                  :disabled="state.loading"
                   @click="fetchRewritePost(post.id)"
                 >
                   <span
                     class="iconify-inline text-xl"
                     data-icon="ion:load-d"
                   ></span>
-                </div>
+                </button>
               </div>
             </div>
           </div>`,
@@ -547,16 +520,12 @@
             error
           } = await postResponse.json();
           if (success) {
-            this.posts.set(postId, {
-              ...post,
-              rewritten: [
-                {
-                  title: "Оригинальный текст",
-                  content: post.original,
-                },
-                ...post.rewritten,
-              ],
+            const post = this.posts.get(postId);
+            post.rewritten.unshift({
+              title: "Оригинальный текст",
+              content: post.original,
             });
+            this.posts.set(postId, post);
 
             return {
               success,
@@ -591,7 +560,6 @@
               v-for="post in posts"
               :key="post.id"
               :post-id="post.id"
-              class="text-wrap whitespace-pre-wrap break-words font-sans text-xs"
             ></post-component>
           </div>
         </div>`,
