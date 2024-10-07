@@ -213,7 +213,7 @@
               @blur="resetScrollableHook"
               @click="resetScrollableHook"
               class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
-              :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
+              :class="{ 'max-h-36 select-none': !state.opened }"
             >
               <div
                 class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
