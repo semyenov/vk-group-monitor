@@ -16,7 +16,7 @@ import type {
   VKGroupMonitorPost,
 } from "./lib/types";
 import { Post, validatePost } from "./lib/ajv";
-import { jsonrepair } from "jsonrepair";
+import { repairJson } from "./lib/jsonrepare";
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   // Private fields
@@ -74,28 +74,28 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   #validateConfig(config: VKGroupMonitorConfig): void {
     if (!config.dbDir) {
-      throw this.#handleError(
-        "DB_DIR_NOT_SET_ERROR",
-        new Error("DB_DIR_NOT_SET_ERROR"),
-      );
+      throw this.#handleError({
+        code: "DB_DIR_NOT_SET_ERROR",
+        error: new Error("DB_DIR_NOT_SET_ERROR"),
+      });
     }
     if (!config.vkAccessToken) {
-      throw this.#handleError(
-        "VK_ACCESS_TOKEN_NOT_SET_ERROR",
-        new Error("VK_ACCESS_TOKEN_NOT_SET_ERROR"),
-      );
+      throw this.#handleError({
+        code: "VK_ACCESS_TOKEN_NOT_SET_ERROR",
+        error: new Error("VK_ACCESS_TOKEN_NOT_SET_ERROR"),
+      });
     }
     if (!config.gigachatApiKey) {
-      throw this.#handleError(
-        "GIGACHAT_API_KEY_NOT_SET_ERROR",
-        new Error("GIGACHAT_API_KEY_NOT_SET_ERROR"),
-      );
+      throw this.#handleError({
+        code: "GIGACHAT_API_KEY_NOT_SET_ERROR",
+        error: new Error("GIGACHAT_API_KEY_NOT_SET_ERROR"),
+      });
     }
     if (config.groupIds.length === 0) {
-      throw this.#handleError(
-        "GROUP_IDS_NOT_SET_ERROR",
-        new Error("GROUP_IDS_NOT_SET_ERROR"),
-      );
+      throw this.#handleError({
+        code: "GROUP_IDS_NOT_SET_ERROR",
+        error: new Error("GROUP_IDS_NOT_SET_ERROR"),
+      });
     }
   }
 
@@ -136,7 +136,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       );
       return this.#gigachatAccessToken;
     } catch (error) {
-      this.#handleError("VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR", error);
+      this.#handleError({
+        code: "VK_MONITOR_UPDATE_GIGACHAT_ACCESS_TOKEN_ERROR",
+        error,
+      });
       return null;
     }
   }
@@ -188,8 +191,12 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
         offset += posts.length;
       } catch (error) {
-        this.#handleError("VK_FETCH_GROUP_POSTS_ERROR", error, {
-          groupId: group.id,
+        this.#handleError({
+          code: "VK_FETCH_GROUP_POSTS_ERROR",
+          error,
+          data: {
+            groupId: group.id,
+          },
         });
       }
     }
@@ -217,10 +224,10 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     if (!this.#gigachatAccessToken) {
       await this.#updateGigachatAccessToken();
       if (!this.#gigachatAccessToken) {
-        throw this.#handleError(
-          "GIGACHAT_API_ACCESS_TOKEN_ERROR",
-          new Error("GIGACHAT_API_ACCESS_TOKEN_ERROR"),
-        );
+        throw this.#handleError({
+          code: "GIGACHAT_API_ACCESS_TOKEN_ERROR",
+          error: new Error("GIGACHAT_API_ACCESS_TOKEN_ERROR"),
+        });
       }
     }
 
@@ -265,11 +272,23 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     try {
       await this.#postsDb!.setItem(post.id.toString(), post);
     } catch (error) {
-      this.#handleError("VK_MONITOR_LEVEL_PUT_POST_ERROR", error, { post });
+        this.#handleError({
+        code: "VK_MONITOR_LEVEL_PUT_POST_ERROR",
+        error,
+        data: { post },
+      });
     }
   }
 
-  #handleError(code: ErrorCode, error: unknown, data: object = {}): void {
+  #handleError({
+    code,
+    error,
+    data = {},
+  }: {
+    code: ErrorCode;
+    error: unknown;
+    data?: object;
+  }): void {
     this.emit(
       "error",
       createError({
@@ -390,7 +409,11 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     try {
       await this.#groupsDb!.setItem(group.id.toString(), group);
     } catch (error) {
-      this.#handleError("VK_MONITOR_LEVEL_PUT_GROUP_ERROR", error, { group });
+      this.#handleError({
+        code: "VK_MONITOR_LEVEL_PUT_GROUP_ERROR",
+        error,
+        data: { group },
+      });
     }
   }
 
@@ -430,19 +453,24 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   validatePost(data: string): Post | string {
     try {
-      const repairedData = jsonrepair(data);
-      const post = JSON.parse(repairedData) as Post;
+      const post = repairJson(data);
       const isValid = validatePost(post);
 
       if (!isValid) {
         console.log("post is not valid", post);
-        return repairedData;
+        return post;
       }
 
-      console.log("post is valid", post);
       return post;
     } catch (error) {
-      console.log("error", error);
+      this.#handleError({
+        code: "POST_VALIDATION_ERROR",
+        error,
+        data: {
+          data,
+        },
+      });
+
       return data;
     }
   }

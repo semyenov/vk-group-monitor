@@ -18,22 +18,28 @@ export const ERROR_MESSAGES = {
   DB_DIR_NOT_SET_ERROR: "db dir is not set in configuration",
   VK_ACCESS_TOKEN_NOT_SET_ERROR: "vk access token is not set in configuration",
   POST_VALIDATION_ERROR: "post validation failed",
+  JSON_REPAIR_FAILED: "json repair failed",
+  GROUP_NOT_FOUND_ERROR: "group not found",
+  POST_NOT_FOUND_ERROR: "post not found",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
 
 export function createError(params: {
   code: ErrorCode;
-  data: Record<string, any>;
-  cause?: Error;
+  data: Record<string, unknown>;
+  cause?: Error | unknown;
   expected?: boolean;
   transient?: boolean;
   message?: string;
 }) {
-  const message: string = params.message || ERROR_MESSAGES[params.code];
+  const message: string =
+    params.message ||
+    ERROR_MESSAGES[params.code];
+
   return new ModuleError(message, {
     code: params.code,
-    cause: params.cause,
+    cause: params.cause as Error,
     expected: params.expected,
     transient: params.transient,
   });

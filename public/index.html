@@ -1,119 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="/favicon.ico" rel="icon" />
 
-    <title>VK Group Monitor Posts</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="/favicon.ico" rel="icon" />
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp,container-queries"></script>
+  <title>VK Group Monitor Posts</title>
 
-    <style type="text/tailwindcss">
-      /* @layer utilities {
-        .content-auto {
-          content-visibility: auto;
-        }
-      } */
-    </style>
-    <!-- Scrollbar -->
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/overlayscrollbars@2.10.0/styles/overlayscrollbars.min.css"
-    />
-    <script
-      type="text/javascript"
-      src="https://unpkg.com/overlayscrollbars@2.10.0/browser/overlayscrollbars.browser.es5.min.js"
-    ></script>
-    <!-- <link
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp,container-queries"></script>
+
+  <!-- Scrollbar -->
+  <link rel="stylesheet" href="https://unpkg.com/overlayscrollbars@2.10.0/styles/overlayscrollbars.min.css" />
+  <script type="text/javascript"
+    src="https://unpkg.com/overlayscrollbars@2.10.0/browser/overlayscrollbars.browser.es5.min.js"></script>
+  <!-- <link
       rel="stylesheet"
       href="https://unpkg.com/simplebar@latest/dist/simplebar.css"
     />
     <script src="https://unpkg.com/simplebar@6.2.7/dist/simplebar.min.js"></script> -->
-    <!-- Iconify -->
-    <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
-    <!-- <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script> -->
-    <!-- Vue.js -->
-    <script src="https://unpkg.com/vue@3.5.11/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/vue-demi@0.14.10/lib/index.iife.js"></script>
-    <script src="https://unpkg.com/@vueuse/core@11.1.0/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@vueuse/shared@11.1.0/index.iife.min.js"></script>
-    <script src="https://unpkg.com/pinia@2.2.4/dist/pinia.iife.js"></script>
-  </head>
+  <!-- Iconify -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script> -->
+  <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+  <!-- Vue.js -->
+  <script src="https://unpkg.com/vue@3.5.11/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/vue-demi@0.14.10/lib/index.iife.js"></script>
+  <script src="https://unpkg.com/@vueuse/core@11.1.0/index.iife.min.js"></script>
+  <script src="https://unpkg.com/@vueuse/shared@11.1.0/index.iife.min.js"></script>
+  <script src="https://unpkg.com/pinia@2.2.4/dist/pinia.iife.js"></script>
 
-  <body class="bg-zinc-100 font-sans text-zinc-700">
-    <div id="app" />
+  <!-- Styles -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+        .content-auto {
+          content-visibility: auto;
+        }
+      }
+    </style>
+  <style>
+    .iconify-inline {
+      display: inline-flex;
+      height: 1em;
+      width: 1em;
+      font-size: 1em;
+      vertical-align: middle;
+      line-height: 1;
+      margin-top: 0;
+      margin-bottom: 0;
+    }
 
-    <script>
-      const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
-      const { createPinia, defineStore } = Pinia;
-      const { useToggle } = VueUse;
-      var {
-        OverlayScrollbars,
-        ScrollbarsHidingPlugin,
-        SizeObserverPlugin,
-        ClickScrollPlugin,
-      } = OverlayScrollbarsGlobal;
+    .simplebar-content::before {
+      content: none !important;
+    }
+  </style>
+</head>
 
-      const PostComponent = defineComponent({
-        name: "post-component",
-        props: {
-          postId: {
-            type: Number,
-            required: true,
-          },
+<body class="bg-zinc-100 font-sans text-zinc-700">
+  <div id="app"></div>
+
+  <script>
+    //** @type {import('vue').Component} */
+    const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
+    const { createPinia, defineStore } = Pinia;
+    const { useToggle } = VueUse;
+    var {
+      OverlayScrollbars,
+      ScrollbarsHidingPlugin,
+      SizeObserverPlugin,
+      ClickScrollPlugin,
+    } = OverlayScrollbarsGlobal;
+
+    const PostComponent = defineComponent({
+      name: "post-component",
+      props: {
+        postId: {
+          type: Number,
+          required: true,
         },
-        setup(props) {
-          const postId = toRef(props, "postId");
-          const postsStore = usePostsStore();
-          const overlayscrollbars = ref(null);
+      },
 
-          const content = ref(null);
+      setup(props) {
+        const postsStore = usePostsStore();
 
-          const post = computed(() => postsStore.getPost(postId.value));
-          const group = computed(() => postsStore.getGroup(post.value.groupId));
-          const photos = computed(() => post.value.attachments.photos);
-          const links = computed(() => post.value.attachments.links);
+        const postId = toRef(props, "postId");
 
-          const [opened, toggleOpened] = useToggle(false);
-          const [loading, toggleLoading] = useToggle(false);
+        const content = ref(null);
+        const overlayscrollbars = ref(null);
 
-          const selectedIndex = ref(post.value.rewritten.length - 1);
-          const setSelectedIndex = (index) => (selectedIndex.value = index);
+        const post = computed(() => postsStore.getPost(postId.value));
+        const group = computed(() => postsStore.getGroup(post.value.groupId));
+        const photos = computed(() => post.value.attachments.photos);
+        const links = computed(() => post.value.attachments.links);
 
-          const selected = computed(
-            () => post.value.rewritten[selectedIndex.value]
-          );
+        const [opened, toggleOpened] = useToggle(false);
+        const [loading, toggleLoading] = useToggle(false);
+        const [scrollable, toggleScrollable] = useToggle(false);
 
-          const failed = computed(() => typeof selected.value === "string");
+        const selectedIndex = ref(post.value.rewritten.length - 1);
+        const setSelectedIndex = (index) => (selectedIndex.value = index);
 
-          const state = computed(() => ({
-            loading: loading.value,
-            opened: opened.value,
-            selected: selectedIndex.value,
-            failed: failed.value,
-          }));
+        const selected = computed(
+          () => post.value.rewritten[selectedIndex.value]
+        );
 
-          watch(content, () => {
-            if (content.value) {
-              console.log(content.value);
-              overlayscrollbars.value = new OverlayScrollbars(content.value, {
-                plugins: [
-                  ScrollbarsHidingPlugin,
-                  SizeObserverPlugin,
-                  ClickScrollPlugin,
-                ],
-              });
-            }
-          });
-          watch(loading, (l) => {
+        const failed = computed(() => typeof selected.value === "string");
+
+        const state = computed(() => ({
+          loading: loading.value,
+          opened: opened.value,
+          selected: selectedIndex.value,
+          scrollable: scrollable.value,
+          failed: failed.value,
+        }));
+
+        watch(scrollable, (s) => {
+          if (s) {
             if (overlayscrollbars.value) {
-              if (l) {
-                overlayscrollbars.value.destroy();
+              overlayscrollbars.value.destroy();
+            }
+            if (content.value) {
+              content.value.style.overflow = "auto";
+            }
+            overlayscrollbars.value = new OverlayScrollbars(content.value, {
+              plugins: [
+                ScrollbarsHidingPlugin,
+                SizeObserverPlugin,
+                ClickScrollPlugin,
+              ],
+            });
+          } else if (overlayscrollbars.value) {
+            overlayscrollbars.value.destroy();
+            if (content.value) {
+              content.value.style.overflow = "hidden";
+            }
+          }
+        });
+
+        watch(loading, (l) => {
+          if (overlayscrollbars.value) {
+            if (l) {
+              overlayscrollbars.value.destroy();
+              if (content.value) {
                 content.value.style.overflow = "hidden";
-              } else {
+              }
+            } else {
+              if (content.value) {
                 content.value.style.overflow = "auto";
                 overlayscrollbars.value = new OverlayScrollbars(content.value, {
                   plugins: [
@@ -126,46 +159,53 @@
                 console.log(overlayscrollbars.value);
               }
             }
-          });
+          }
+        });
 
-          return {
-            post,
-            group,
-            photos,
-            links,
-            state,
-            content,
-            selected,
-            toggleOpened,
-            setSelectedIndex,
-            fetchRewritePost: async (postId) => {
-              toggleLoading(true);
-              await postsStore.fetchRewritePost(postId);
-              setSelectedIndex(post.value.rewritten.length - 1);
-              toggleLoading(false);
-            },
-            formatDate: (date) => {
-              return new Date(date * 1000).toLocaleString({
-                language: "ru",
-                numberingSystem: "ru-RU",
-                timeZone: "Europe/Moscow",
-              });
-            },
-          };
-        },
+        return {
+          post,
+          group,
+          photos,
+          links,
+          state,
+          content,
+          selected,
+          toggleOpened,
+          toggleScrollable,
+          setSelectedIndex,
+          fetchRewritePost: async (postId) => {
+            toggleLoading(true);
+            await postsStore.fetchRewritePost(postId);
+            setSelectedIndex(post.value.rewritten.length - 1);
+            toggleLoading(false);
+          },
+          formatDate: (date) => {
+            return new Date(date * 1000).toLocaleString({
+              language: "ru",
+              numberingSystem: "ru-RU",
+              timeZone: "Europe/Moscow",
+            });
+          },
+          formatNumber: (number) => {
+            return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+          },
+        };
+      },
 
-        template: `
+      template: `
           <div
-            class="relative mb-6 overflow-hidden rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20"
+            class="mb-6 overflow-hidden rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20"
             :class="{ 'shadow-none': state.loading }"
           >
             <div
               ref="content"
-              class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60"
-              :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
+              @mouseenter="toggleScrollable(true)"
+              @mouseleave="toggleScrollable(false)"
+              class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
+              :class="{ 'max-h-48': !state.opened, 'max-h-96': state.opened && state.loading }"
             >
               <div
-                class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex h-full w-full flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
+                class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
                 :class="{ 'opacity-100': state.loading, 'opacity-0': !state.loading }"
               >
                 <span
@@ -175,6 +215,7 @@
                 </span>
               </div>
               <div
+                v-if="group"
                 @click="() => toggleOpened()"
                 class="text-md z-30 flex cursor-pointer flex-row items-center justify-center rounded-t-lg border-b bg-zinc-100 px-4 py-1 font-bold leading-none sm:justify-between"
               >
@@ -185,7 +226,7 @@
                 <div
                   class="flex flex-1 flex-col items-start justify-between py-1 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div class="flex flex-row items-center justify-start">
+                  <div class="flex text-lg flex-row items-center justify-start">
                     <span class="inline-flex uppercase">
                       {{ group.name || group.id }}
                     </span>
@@ -212,48 +253,48 @@
                     class="font-bold text-zinc-600"
                   >Вариант текста #{{ state.selected || post.rewritten.length - 1 }}</span>
                 </div>
-                <div v-if="typeof selected === 'string'" class="flex w-full flex-col items-start justify-start gap-4 px-4 py-2">
+                <div v-if="typeof selected === 'string'" class="flex flex-1 flex-col w-full items-start justify-start gap-4 px-4 py-2">
                   <span class="text-zinc-600">{{ selected }}</span>
                 </div>
-                <div class="flex w-full flex-col items-start justify-start gap-4 px-4 py-2">
+                <div class="flex flex-1 flex-col break-all w-full items-start justify-start gap-4 px-4 py-2">
                   <div v-if="selected.title" class="flex flex-col items-start justify-start gap-1">
-                    <!-- <span class="iconify-inline text-xs font-bold text-zinc-500">Заголовок:</span>  -->
+                    <!-- <span class="text-xs font-bold text-zinc-500">Заголовок:</span>  -->
                     <h4 class="mb-0 flex flex-col items-start text-lg font-semibold leading-tight text-zinc-600">
                       <span class="text-zinc-600">{{ selected.title }}</span>
                     </h4>
                   </div>
                   <div v-if="selected.content" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Контент:</span>
+                    <span class="text-xs font-bold text-zinc-500">Контент:</span>
                     <div class="flex flex-col items-start justify-start">
                       <span class="text-zinc-600">{{ selected.content }}</span>
                     </div>
                   </div>
                   <div v-if="selected.poll_question" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Опрос:</span>
+                    <span class="text-xs font-bold text-zinc-500">Опрос:</span>
                     <div class="flex flex-row items-center">
                       <span class="text-zinc-600">{{ selected.poll_question }}</span>
                     </div>
                   </div>
                   <div v-if="selected.key_points" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Ключевые точки:</span>
+                    <span class="text-xs font-bold text-zinc-500">Ключевые точки:</span>
                     <div class="flex w-full flex-col items-start">
                       <span v-for="key_point in selected.key_points" class="text-zinc-600">{{ key_point }}</span>
                     </div>
                   </div>
                   <div v-if="selected.practical_advice" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Практические советы:</span>
+                    <span class="text-xs font-bold text-zinc-500">Практические советы:</span>
                     <div class="flex flex-col items-start justify-start">
                       <span class="text-zinc-600">{{ selected.practical_advice }}</span>
                     </div>
                   </div>
                   <div v-if="selected.hashtags" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Хэштеги:</span>
+                    <span class="text-xs font-bold text-zinc-500">Хэштеги:</span>
                     <div class="flex flex-col items-start justify-start">
                       <span v-for="hashtag in selected.hashtags" class="text-zinc-600">{{ hashtag }}</span>
                     </div>
                   </div>
                   <div v-if="selected.source_link" class="flex flex-col items-start justify-start gap-1">
-                    <span class="iconify-inline text-xs font-bold text-zinc-500">Ссылка:</span>
+                    <span class="text-xs font-bold text-zinc-500">Ссылка:</span>
                     <div class="flex flex-col items-start justify-start">
                       <a target="_blank" :href="selected.source_link" class="text-zinc-600">{{ selected.source_link }}</a>
                     </div>
@@ -277,10 +318,10 @@
                   <span
                     class="inline-flex items-center justify-center text-xs text-zinc-500"
                   >
-                    <iconify-icon
-                      class="mr-1 text-zinc-500"
-                      icon="mdi:image-multiple"
-                    ></iconify-icon>
+                    <span
+                      class="iconify-inline text-zinc-500"
+                      data-icon="mdi:image-multiple"
+                    ></span>
                     <a target="_blank" :href="photo.url" class="text-zinc-600"
                       >{{ photo.text || photo.id }}</a
                     >
@@ -302,10 +343,10 @@
                   target="_blank"
                   :href="link.url"
                 >
-                  <iconify-icon
-                    class="mr-1 text-zinc-500"
-                    icon="mdi:link"
-                  ></iconify-icon>
+                  <span
+                    class="iconify-inline text-zinc-500"
+                    data-icon="mdi:link"
+                  ></span>
                   <span class="text-zinc-600">
                     {{ link.title || link.url }}
                   </span>
@@ -323,38 +364,38 @@
                 <div
                   class="flex-0 flex items-center justify-start pb-1 pl-4 pr-2 pt-2"
                 >
-                  <iconify-icon
-                    class="mr-1 text-zinc-500"
-                    icon="mdi:heart-outline"
-                  ></iconify-icon>
+                  <span
+                    class="h-4 w-4 mr-1 iconify-inline text-zinc-500"
+                    data-icon="mdi:heart-outline"
+                  ></span>
                   <span>{{ post.likesCount }}</span>
                 </div>
                 <div
                   class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
                 >
-                  <iconify-icon
-                    class="mr-1 text-zinc-500"
-                    icon="mdi:share-outline"
-                  ></iconify-icon>
+                  <span
+                    class="h-4 w-4 mr-1 iconify-inline text-zinc-500"
+                    data-icon="mdi:share-outline"
+                  ></span>
                   <span>{{ post.repostsCount }}</span>
                 </div>
                 <div
                   class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
                 >
-                  <iconify-icon
-                    class="mr-1 text-zinc-500"
-                    icon="mdi:eye-outline"
-                  ></iconify-icon>
+                  <span
+                    class="h-4 w-4 mr-1 iconify-inline text-zinc-500"
+                    data-icon="mdi:eye-outline"
+                  ></span>
                   <span>{{ post.viewsCount }}</span>
                 </div>
                 <div
                   class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
                   v-if="photos.length > 0 || links.length > 0"
                 >
-                  <iconify-icon
-                    class="mr-1 text-zinc-500"
-                    icon="mdi:attachment"
-                  ></iconify-icon>
+                  <span
+                    class="h-4 w-4 mr-1 iconify-inline text-zinc-500"
+                    data-icon="mdi:attachment"
+                  ></span>
                   <span
                     >{{ links.length + photos.length }}</span
                   >
@@ -378,38 +419,37 @@
                   :class="{ 'text-green-500': !state.failed, 'text-red-500': state.failed }"
                   @click="fetchRewritePost(post.id)"
                 >
-                  <iconify-icon
-                    class="inline-flex text-xl"
-                    icon="ion:load-d"
-                  ></iconify-icon>
+                  <span
+                    class="iconify-inline text-xl"
+                    data-icon="ion:load-d"
+                  ></span>
                 </div>
               </div>
             </div>
-          </div>
-        `,
-      });
+          </div>`,
+    });
 
-      const HeaderComponent = defineComponent({
-        name: "header-component",
-        setup() {
-          const postsStore = usePostsStore();
-          const postsLength = computed(() => postsStore.getPosts.length);
-          const scrollToTop = () => {
-            window.scrollTo({
-              top: 0,
-              behavior: "smooth",
-            });
-          };
+    const HeaderComponent = defineComponent({
+      name: "header-component",
+      setup() {
+        const postsStore = usePostsStore();
+        const postsLength = computed(() => postsStore.getPosts.length);
+        const scrollToTop = () => {
+          window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+          });
+        };
 
-          return {
-            postsLength,
-            fetchPosts: async () => {
-              await postsStore.fetchPosts();
-              scrollToTop();
-            },
-          };
-        },
-        template: `
+        return {
+          postsLength,
+          fetchPosts: async () => {
+            await postsStore.fetchPosts();
+            scrollToTop();
+          },
+        };
+      },
+      template: `
           <h1
             class="max-w-screen sticky top-0 z-50 mx-auto mb-8 flex w-full cursor-pointer flex-row items-center justify-center gap-4 rounded-b-xl border-b border-b-zinc-600 bg-zinc-800/95 py-3 shadow-lg shadow-zinc-400/40 backdrop-blur transition-colors duration-500 hover:text-zinc-50"
               @click="fetchPosts"
@@ -420,162 +460,171 @@
               <div
                 class="drop-shadow-zinc-100 mr-4 inline-flex h-full flex-row items-center justify-center text-xl font-bold leading-none text-zinc-50 drop-shadow-xl"
               >
-                <iconify-icon
-                  class="mr-2 inline-flex text-2xl text-zinc-200"
-                  icon="ion:logo-vk"
-                ></iconify-icon>
+                <span
+                  class="iconify-inline text-2xl mr-2 text-zinc-200"
+                  data-icon="ion:logo-vk"
+                ></span>
                 <span class="text-zinc-50">Group Monitor</span>
               </div>
               <div
-                class="inline-flex items-center justify-center rounded-md border border-zinc-500 bg-zinc-700 px-1 py-1 text-sm font-bold leading-none shadow shadow-zinc-800/20 transition-colors duration-300 hover:border-zinc-500/80 hover:bg-zinc-800"
+                class="inline-flex items-center justify-center rounded-md border border-zinc-500 bg-zinc-700 px-1 py-1 font-bold leading-none shadow shadow-zinc-800/20 transition-colors duration-300 hover:border-zinc-500/80 hover:bg-zinc-800"
               >
                 <span class="mx-1 text-zinc-100">{{ postsLength }}</span>
-                <iconify-icon
-                  class="inline-flex text-zinc-100/80"
-                  icon="ion:newspaper-sharp"
-                ></iconify-icon>
+                <span
+                  class="h-4 w-4 iconify-inline text-zinc-100/80"
+                  data-icon="ion:newspaper-sharp"
+                ></span>
               </div>
             </div>
           </h1>
         `,
-      });
+    });
 
-      const usePostsStore = defineStore("posts", {
-        state: () => ({
-          posts: new Map(),
-          groups: new Map(),
-        }),
-        actions: {
-          async fetchPosts() {
-            const response = await fetch("/api/posts");
-            const { data: posts, success, error } = await response.json();
-            if (success) {
-              posts.forEach((post) => {
-                this.posts.set(post.id, {
-                  ...post,
-                  rewritten: [
-                    {
-                      title: "Оригинальный текст",
-                      content: post.original,
-                    },
-                    ...post.rewritten,
-                  ],
-                });
+    const usePostsStore = defineStore("posts", {
+      state: () => ({
+        posts: new Map(),
+        groups: new Map(),
+      }),
+      actions: {
+        async fetchPosts() {
+          const response = await fetch("/api/posts");
+          const { data: posts, success, error } = await response.json();
+          if (success) {
+            posts.forEach((post) => {
+              const { original, rewritten } = post;
+
+              delete post.original;
+              post.rewritten.unshift({
+                title: "Оригинальный текст",
+                content: original,
               });
 
-              return {
-                success,
-                posts,
-              };
-            }
-
-            return {
-              error,
-            };
-          },
-          async fetchGroups() {
-            const groupsResponse = await fetch("/api/groups");
-            const {
-              data: groups,
-              success,
-              error,
-            } = await groupsResponse.json();
-            if (success) {
-              groups.forEach((group) => {
-                this.groups.set(group.id, group);
-              });
-
-              return {
-                success,
-                groups,
-              };
-            }
-
-            return {
-              error,
-            };
-          },
-          async fetchRewritePost(postId) {
-            const postResponse = await fetch(`/api/posts/${postId}/rewrite`, {
-              method: "POST",
-              headers: [["Content-Type", "application/json"]],
+              this.posts.set(post.id, post);
             });
-            const { data: post, success } = await postResponse.json();
-            if (success) {
-              this.posts.set(postId, {
-                ...post,
-                rewritten: [
-                  {
-                    title: "Оригинальный текст",
-                    content: post.original,
-                  },
-                  ...post.rewritten,
-                ],
-              });
-            }
-          },
-        },
-        getters: {
-          getPost: (state) => (postId) => state.posts.get(postId),
-          getGroup: (state) => (groupId) => state.groups.get(groupId),
-          getPosts: (state) => Array.from(state.posts.values()),
-          getGroups: (state) => Array.from(state.groups.values()),
-        },
-      });
 
-      const app = createApp({
-        components: {
-          "post-component": PostComponent,
-          "header-component": HeaderComponent,
-        },
-        template: `
-          <div class="mx-auto flex w-full max-w-screen-lg flex-col items-center justify-center bg-zinc-100">
-            <header-component />
-
-            <div class="mx-auto max-w-3xl px-4">
-              <post-component
-                v-for="post in posts"
-                :key="post.id"
-                :post-id="post.id"
-                class="text-wrap w-full whitespace-pre-wrap break-words font-sans text-xs"
-              ></post-component>
-            </div>
-          </div>
-        `,
-        setup() {
-          const postsStore = usePostsStore();
-          const posts = computed(() => postsStore.getPosts);
-          const groups = computed(() => postsStore.getGroups);
+            return {
+              success,
+              posts,
+            };
+          }
 
           return {
-            posts,
-            groups,
-            scrollToTop: () =>
-              window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              }),
+            error,
           };
         },
-        async mounted() {
-          const postsStore = usePostsStore();
 
-          await postsStore.fetchGroups();
-          await postsStore.fetchPosts();
+        async fetchGroups() {
+          const groupsResponse = await fetch("/api/groups");
+          const {
+            data: groups,
+            success,
+            error,
+          } = await groupsResponse.json();
+          if (success) {
+            groups.forEach((group) => {
+              this.groups.set(group.id, group);
+            });
+
+            return {
+              success,
+              groups,
+            };
+          }
+
+          return {
+            error,
+          };
         },
-      });
 
-      const pinia = createPinia();
+        async fetchRewritePost(postId) {
+          const postResponse = await fetch(`/api/posts/${postId}/rewrite`, {
+            method: "POST",
+            headers: [["Content-Type", "application/json"]],
+          });
+          const {
+            data: post,
+            success,
+            error
+          } = await postResponse.json();
+          if (success) {
+            this.posts.set(postId, {
+              ...post,
+              rewritten: [
+                {
+                  title: "Оригинальный текст",
+                  content: post.original,
+                },
+                ...post.rewritten,
+              ],
+            });
 
-      app.use(pinia);
-      app.component("post-component", PostComponent);
-      app.component("header-component", HeaderComponent);
-      app.mount("#app");
-    </script>
-    <style>
-      .simplebar-content::before {
-        content: none !important;
-      }
-    </style>
-  </body>
+            return {
+              success,
+              post,
+            };
+          }
+
+          return {
+            error,
+          };
+        },
+      },
+
+      getters: {
+        getPost: (state) => (postId) => state.posts.get(postId),
+        getGroup: (state) => (groupId) => state.groups.get(groupId),
+        getPosts: (state) => Array.from(state.posts.values()),
+        getGroups: (state) => Array.from(state.groups.values()),
+      },
+    });
+
+    const app = createApp({
+      components: {
+        PostComponent,
+        HeaderComponent,
+      },
+      template: `<div class="mx-auto max-w-screen w-full flex flex-1 flex-col items-center justify-center bg-zinc-100">
+          <header-component />
+
+          <div class="mx-auto flex flex-1 max-w-3xl flex-col w-full h-full px-4">
+            <post-component
+              v-for="post in posts"
+              :key="post.id"
+              :post-id="post.id"
+              class="text-wrap whitespace-pre-wrap break-words font-sans text-xs"
+            ></post-component>
+          </div>
+        </div>`,
+
+      setup() {
+        const postsStore = usePostsStore();
+        const posts = computed(() => postsStore.getPosts);
+        const groups = computed(() => postsStore.getGroups);
+
+        return {
+          posts,
+          groups,
+          scrollToTop: () =>
+            window.scrollTo({
+              top: 0,
+              behavior: "smooth",
+            }),
+        };
+      },
+
+      async mounted() {
+        const postsStore = usePostsStore();
+
+        await postsStore.fetchGroups();
+        await postsStore.fetchPosts();
+      },
+    });
+
+    const pinia = createPinia();
+    app.use(pinia);
+
+    app.mount("#app");
+  </script>
+</body>
+
 </html>
