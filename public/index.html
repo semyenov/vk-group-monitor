@@ -1,335 +1,581 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/favicon.ico" rel="icon" />
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="/favicon.ico" rel="icon">
+    <title>VK Group Monitor Posts</title>
 
-  <title>VK Group Monitor Posts</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp,container-queries"></script>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Iconify -->
-  <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
-  <!-- <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script> -->
-  <!-- Vue.js -->
-  <script src="https://unpkg.com/vue@3.5.11/dist/vue.global.js"></script>
-</head>
+    <style type="text/tailwindcss">
+      /* @layer utilities {
+        .content-auto {
+          content-visibility: auto;
+        }
+      } */
+    </style>
+    <!-- Scrollbar -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/overlayscrollbars@2.10.0/styles/overlayscrollbars.min.css"
+    />
+    <script
+      type="text/javascript"
+      src="https://unpkg.com/overlayscrollbars@2.10.0/browser/overlayscrollbars.browser.es5.min.js"
+    ></script>
+    <!-- <link
+      rel="stylesheet"
+      href="https://unpkg.com/simplebar@latest/dist/simplebar.css"
+    />
+    <script src="https://unpkg.com/simplebar@6.2.7/dist/simplebar.min.js"></script> -->
+    <!-- Iconify -->
+    <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
+    <!-- <script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script> -->
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3.5.11/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/vue-demi@0.14.10/lib/index.iife.js"></script>
+    <script src="https://unpkg.com/@vueuse/core@11.1.0/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@vueuse/shared@11.1.0/index.iife.min.js"></script>
+    <script src="https://unpkg.com/pinia@2.2.4/dist/pinia.iife.js"></script>
+  </head>
 
-<body class="font-sans bg-zinc-100 text-zinc-700">
-  <div id="app">
-    <h1
-      class="sticky top-0 z-50 flex flex-row items-center justify-center gap-4 py-3 mx-auto mb-8 transition-colors duration-500 border-b shadow-lg cursor-pointer max-w-screen rounded-b-xl border-b-zinc-600 bg-zinc-800/95 shadow-zinc-400/40 backdrop-blur hover:text-zinc-50"
-      @click="() => {
-      fetchPosts()
-      scrollToTop()
-    }">
-      <div class="flex flex-row items-center justify-between flex-1 max-w-3xl px-4 mx-auto">
-        <div
-          class="inline-flex flex-row items-stretch justify-center h-full mr-4 text-lg font-bold leading-none drop-shadow-zinc-100 text-zinc-50 drop-shadow-xl">
-          <iconify-icon class="inline-flex h-full mr-2 text-zinc-200" icon="ion:logo-vk"></iconify-icon>
-          <span class="text-zinc-50">Group Monitor</span>
-        </div>
-        <div
-          class="inline-flex items-center justify-center px-1 py-1 text-sm font-bold leading-none transition-colors duration-300 border rounded-md shadow border-zinc-500 bg-zinc-700 shadow-zinc-800/20 hover:border-zinc-500/80 hover:bg-zinc-800">
-          <span class="mx-1 text-zinc-100">{{ posts.length }}</span>
-          <iconify-icon class="inline-flex text-zinc-100/80" icon="ion:newspaper-sharp"></iconify-icon>
-        </div>
-      </div>
-    </h1>
+  <body class="bg-zinc-100 font-sans text-zinc-700">
+    <div id="app" />
 
-    <div class="max-w-3xl px-4 mx-auto">
-      <div class="relative pb-0 mb-6 rounded-lg shadow-lg bg-zinc-300/60 shadow-zinc-500/20" v-for="post in posts"
-        :key="post.id">
-        <div :class="{ 'max-h-36 overflow-hidden': !state.opened[post.id] }"
-          class="relative z-30 pb-4 leading-tight border divide-y rounded-lg shadow-inner cursor-default divide-dashed divide-zinc-400/20 border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 text-zinc-600 shadow-zinc-300/60">
-          <div @click="toggleOriginal(post.id)"
-            class="flex flex-row items-center justify-center px-4 py-2 font-bold leading-none rounded-t-lg cursor-pointer text-md bg-zinc-100 sm:justify-between">
-            <img
-              class="flex self-center w-auto mr-3 border-2 rounded-full shadow max-w-12 sm:max-w-6 max-h-12 border-zinc-50 sm:max-h-6"
-              :src="getGroup(post.groupId)?.photo_50 || ''">
+    <script>
+      const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
+      const { createPinia, defineStore } = Pinia;
+      const { useToggle } = VueUse;
+      var {
+        OverlayScrollbars,
+        ScrollbarsHidingPlugin,
+        SizeObserverPlugin,
+        ClickScrollPlugin,
+      } = OverlayScrollbarsGlobal;
+
+      const PostComponent = defineComponent({
+        name: "post-component",
+        props: {
+          postId: {
+            type: Number,
+            required: true,
+          },
+        },
+        setup(props) {
+          const postId = toRef(props, "postId");
+          const postsStore = usePostsStore();
+          const overlayscrollbars = ref(null);
+
+          const content = ref(null);
+
+          const post = computed(() => postsStore.getPost(postId.value));
+          const group = computed(() => postsStore.getGroup(post.value.groupId));
+          const photos = computed(() => post.value.attachments.photos);
+          const links = computed(() => post.value.attachments.links);
+
+          const [opened, toggleOpened] = useToggle(false);
+          const [loading, toggleLoading] = useToggle(false);
+
+          const selectedIndex = ref(post.value.rewritten.length - 1);
+          const setSelectedIndex = (index) => (selectedIndex.value = index);
+
+          const selected = computed(
+            () => post.value.rewritten[selectedIndex.value]
+          );
+
+          const failed = computed(() => typeof selected.value === "string");
+
+          const state = computed(() => ({
+            loading: loading.value,
+            opened: opened.value,
+            selected: selectedIndex.value,
+            failed: failed.value,
+          }));
+
+          watch(content, () => {
+            if (content.value) {
+              console.log(content.value);
+              overlayscrollbars.value = new OverlayScrollbars(content.value, {
+                plugins: [
+                  ScrollbarsHidingPlugin,
+                  SizeObserverPlugin,
+                  ClickScrollPlugin,
+                ],
+              });
+            }
+          });
+          watch(loading, (l) => {
+            if (overlayscrollbars.value) {
+              if (l) {
+                overlayscrollbars.value.destroy();
+                content.value.style.overflow = "hidden";
+              } else {
+                content.value.style.overflow = "auto";
+                overlayscrollbars.value = new OverlayScrollbars(content.value, {
+                  plugins: [
+                    ScrollbarsHidingPlugin,
+                    SizeObserverPlugin,
+                    ClickScrollPlugin,
+                  ],
+                });
+
+                console.log(overlayscrollbars.value);
+              }
+            }
+          });
+
+          return {
+            post,
+            group,
+            photos,
+            links,
+            state,
+            content,
+            selected,
+            toggleOpened,
+            setSelectedIndex,
+            fetchRewritePost: async (postId) => {
+              toggleLoading(true);
+              await postsStore.fetchRewritePost(postId);
+              setSelectedIndex(post.value.rewritten.length - 1);
+              toggleLoading(false);
+            },
+            formatDate: (date) => {
+              return new Date(date * 1000).toLocaleString({
+                language: "ru",
+                numberingSystem: "ru-RU",
+                timeZone: "Europe/Moscow",
+              });
+            },
+          };
+        },
+
+        template: `
+          <div
+            class="relative mb-6 overflow-hidden rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20"
+            :class="{ 'shadow-none': state.loading }"
+          >
             <div
-              class="flex flex-col items-start justify-between flex-1 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex flex-row items-center justify-start">
-                <span class="inline-flex my-1 uppercase sm:my-0">
-                  {{ getGroup(post.groupId)?.name || post.groupId }}
+              ref="content"
+              class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60"
+              :class="{ 'max-h-36': !state.opened, 'max-h-96': state.opened && state.loading }"
+            >
+              <div
+                class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex h-full w-full flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
+                :class="{ 'opacity-100': state.loading, 'opacity-0': !state.loading }"
+              >
+                <span
+                  class="rounded border border-zinc-200 bg-zinc-50 px-4 py-2 text-center text-lg font-semibold uppercase leading-none text-zinc-500 shadow-md"
+                >
+                  Генерирую текст
                 </span>
               </div>
-              <span
-                class="inline-flex text-xs font-semibold rounded text-nowrap text-zinc-500 sm:mb-1 sm:border sm:border-zinc-200 sm:bg-zinc-100 sm:px-2 sm:py-1 sm:shadow-sm">
-                {{ formatDate(post.date) }}
-              </span>
+              <div
+                @click="() => toggleOpened()"
+                class="text-md z-30 flex cursor-pointer flex-row items-center justify-center rounded-t-lg border-b bg-zinc-100 px-4 py-1 font-bold leading-none sm:justify-between"
+              >
+                <img
+                  class="max-w-12 sm:max-w-6 mr-3 flex max-h-12 w-auto self-center rounded-full border-2 border-zinc-50 shadow sm:max-h-6"
+                  :src="group.photo_50 || ''"
+                />
+                <div
+                  class="flex flex-1 flex-col items-start justify-between py-1 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="flex flex-row items-center justify-start">
+                    <span class="inline-flex uppercase">
+                      {{ group.name || group.id }}
+                    </span>
+                  </div>
+                  <span
+                    class="text-nowrap inline-flex rounded border-dashed text-xs text-zinc-500 sm:mb-1 sm:border sm:border-zinc-200 sm:bg-zinc-50 sm:px-2 sm:py-1 sm:shadow-sm"
+                  >
+                    {{ formatDate(post.date) }}
+                  </span>
+                </div>
+              </div>
+              <div
+                class="flex w-full flex-col items-center justify-center divide-y divide-dashed divide-zinc-200"
+              >
+                <div
+                  class="flex w-full flex-row items-center justify-start bg-zinc-50 px-4 pb-1 pt-2 text-xs"
+                >
+                  <span
+                    v-if="state.selected === 0"
+                    class="font-bold text-zinc-600"
+                  >Оригинальный текст</span> 
+                  <span
+                    v-else
+                    class="font-bold text-zinc-600"
+                  >Вариант текста #{{ state.selected || post.rewritten.length - 1 }}</span>
+                </div>
+                <div v-if="typeof selected === 'string'" class="flex w-full flex-col items-start justify-start gap-4 px-4 py-2">
+                  <span class="text-zinc-600">{{ selected }}</span>
+                </div>
+                <div class="flex w-full flex-col items-start justify-start gap-4 px-4 py-2">
+                  <div v-if="selected.title" class="flex flex-col items-start justify-start gap-1">
+                    <!-- <span class="iconify-inline text-xs font-bold text-zinc-500">Заголовок:</span>  -->
+                    <h4 class="mb-0 flex flex-col items-start text-lg font-semibold leading-tight text-zinc-600">
+                      <span class="text-zinc-600">{{ selected.title }}</span>
+                    </h4>
+                  </div>
+                  <div v-if="selected.content" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Контент:</span>
+                    <div class="flex flex-col items-start justify-start">
+                      <span class="text-zinc-600">{{ selected.content }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selected.poll_question" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Опрос:</span>
+                    <div class="flex flex-row items-center">
+                      <span class="text-zinc-600">{{ selected.poll_question }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selected.key_points" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Ключевые точки:</span>
+                    <div class="flex w-full flex-col items-start">
+                      <span v-for="key_point in selected.key_points" class="text-zinc-600">{{ key_point }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selected.practical_advice" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Практические советы:</span>
+                    <div class="flex flex-col items-start justify-start">
+                      <span class="text-zinc-600">{{ selected.practical_advice }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selected.hashtags" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Хэштеги:</span>
+                    <div class="flex flex-col items-start justify-start">
+                      <span v-for="hashtag in selected.hashtags" class="text-zinc-600">{{ hashtag }}</span>
+                    </div>
+                  </div>
+                  <div v-if="selected.source_link" class="flex flex-col items-start justify-start gap-1">
+                    <span class="iconify-inline text-xs font-bold text-zinc-500">Ссылка:</span>
+                    <div class="flex flex-col items-start justify-start">
+                      <a target="_blank" :href="selected.source_link" class="text-zinc-600">{{ selected.source_link }}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="photos.length > 0"
+                class="flex w-full flex-col items-start justify-start divide-y divide-dashed divide-zinc-200"
+              >
+                <div
+                  class="flex w-full flex-row items-center justify-start bg-zinc-50 px-4 pb-1 pt-2 text-xs"
+                >
+                  <span class="font-bold text-zinc-600">Вложенные фото</span>
+                </div>
+                <div
+                  v-for="photo in photos"
+                  class="flex w-full flex-col items-start justify-center border-zinc-300 px-4 py-2 text-xs"
+                >
+                  <img class="mb-2 flex w-full" :src="photo.url || ''" />
+                  <span
+                    class="inline-flex items-center justify-center text-xs text-zinc-500"
+                  >
+                    <iconify-icon
+                      class="mr-1 text-zinc-500"
+                      icon="mdi:image-multiple"
+                    ></iconify-icon>
+                    <a target="_blank" :href="photo.url" class="text-zinc-600"
+                      >{{ photo.text || photo.id }}</a
+                    >
+                  </span>
+                </div>
+              </div>
+              <div
+                v-if="links.length > 0"
+                class="flex w-full flex-col items-center justify-center divide-y divide-dashed divide-zinc-200"
+              >
+                <div
+                  class="flex w-full flex-row items-center justify-start bg-zinc-50 px-4 pb-1 pt-2 text-xs"
+                >
+                  <span class="font-bold text-zinc-600">Вложенные ссылки</span>
+                </div>
+                <a
+                  v-for="link in links"
+                  class="mb-2 flex w-full flex-row items-start justify-start border-zinc-300 px-4 py-2 text-xs"
+                  target="_blank"
+                  :href="link.url"
+                >
+                  <iconify-icon
+                    class="mr-1 text-zinc-500"
+                    icon="mdi:link"
+                  ></iconify-icon>
+                  <span class="text-zinc-600">
+                    {{ link.title || link.url }}
+                  </span>
+                </a>
+              </div>
             </div>
-          </div>
-          <div class="flex flex-col items-center justify-center w-full divide-y divide-dashed divide-zinc-200">
-            <div v-if="state.opened[post.id]"
-              class="flex flex-row items-center justify-start w-full px-4 pt-2 pb-1 text-xs bg-zinc-50">
-              <span v-if="state.selected[post.id] !== 0" class="font-bold text-zinc-600">Вариант текста
-                #{{state.selected[post.id] || post.rewritten.length - 1}}:</span>
-              <span v-else class="font-bold text-zinc-600">Оригинальный
-                текст:</span>
-            </div>
-            <post-component :key="post.id + state.selected[post.id]"
-              v-if="typeof (post.rewritten[state.selected[post.id] || (post.rewritten.length - 1)]) === 'object'"
-              :post="post.rewritten[state.selected[post.id] !== undefined ? state.selected[post.id] : post.rewritten.length - 1]"
-              class="w-full px-4 py-2 font-sans text-xs break-words whitespace-pre-wrap text-wrap"></post-component>
-            <pre v-else :key="post.id + state.selected[post.id]"
-              class="w-full px-4 py-2 font-sans text-xs break-words whitespace-pre-wrap text-wrap">{{ post.rewritten[state.selected[post.id] !== undefined ? state.selected[post.id] : post.rewritten.length - 1] || 'Ошибка при получении текста' }}</pre>
-          </div>
-          <div v-if="post.attachments.photos.length > 0"
-            class="flex flex-col items-start justify-start w-full divide-y divide-dashed divide-zinc-200">
-            <div v-if="state.opened[post.id]"
-              class="flex flex-row items-center justify-start w-full px-4 pt-2 pb-1 text-xs bg-zinc-50">
-              <span class="font-bold text-zinc-600">Вложенные фото:</span>
-            </div>
-            <div v-for="photo in post.attachments.photos"
-              class="flex flex-col items-start justify-center w-full px-4 py-2 text-xs border-zinc-300">
-              <img class="flex w-full mb-2" :src="photo.url || ''" />
-              <span class="inline-flex items-center justify-center text-xs text-zinc-500">
-                <iconify-icon class="mr-1 text-zinc-500" icon="mdi:image-multiple"></iconify-icon>
-                <span class="text-zinc-600">{{ photo.text || photo.id
-                  }}</span>
-              </span>
-            </div>
-          </div>
-          <div v-if="post.attachments.links.length > 0"
-            class="flex flex-col items-center justify-center w-full divide-y divide-dashed divide-zinc-200">
-            <div v-if="state.opened[post.id]"
-              class="flex flex-row items-center justify-start w-full px-4 pt-2 pb-1 text-xs bg-zinc-50">
-              <span class="font-bold text-zinc-600">Вложенные ссылки:</span>
-            </div>
-            <a v-for="link in post.attachments.links"
-              class="flex flex-row items-start justify-start w-full px-4 py-2 mb-2 text-xs border-zinc-300"
-              target="_blank" :href="link.url">
-              <iconify-icon class="mr-1 text-zinc-500" icon="mdi:link"></iconify-icon>
-              <span class="text-zinc-600">{{ link.title }}</span>
-            </a>
 
-          </div>
-          <div
-            class="absolute top-0 bottom-0 left-0 right-0 z-20 flex items-center justify-center leading-none transition-opacity duration-300 rounded-lg shadow bg-zinc-200/40 filter backdrop-blur-sm"
-            v-if="state.loading[post.id]">
-            <span
-              class="px-4 py-2 text-lg font-semibold leading-none text-center uppercase border rounded shadow-md border-zinc-200 bg-zinc-50 text-zinc-500">
-              Генерация текста
-            </span>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div
-          class="box-content relative flex flex-row flex-wrap items-stretch justify-between pt-2 -mt-3 text-xs border rounded-b-lg border-zinc-400/60 bg-zinc-100/80 text-zinc-500">
-          <div class="flex flex-row flex-wrap leading-none uppercase divide-x flex-0 divide-zinc-300">
-            <div class="flex items-center justify-start pt-2 pb-1 pl-4 pr-2 flex-0">
-              <iconify-icon class="mr-1 text-zinc-500" icon="mdi:heart-outline"></iconify-icon>
-              <span>{{ post.likesCount }}</span>
-            </div>
-            <div class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5">
-              <iconify-icon class="mr-1 text-zinc-500" icon="mdi:share-outline"></iconify-icon>
-              <span>{{ post.repostsCount }}</span>
-            </div>
-            <div class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5">
-              <iconify-icon class="mr-1 text-zinc-500" icon="mdi:eye-outline"></iconify-icon>
-              <span>{{ post.viewsCount }}</span>
-            </div>
-            <div class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
-              v-if="post.attachments.photos.length > 0 || post.attachments.links.length > 0">
-              <iconify-icon class="mr-1 text-zinc-500" icon="mdi:attachment"></iconify-icon>
-              <span>{{ post.attachments.links.length +
-                post.attachments.photos.length }}</span>
-            </div>
-          </div>
-          <div
-            class="right-0 flex flex-row items-stretch justify-end flex-1 w-full h-full overflow-hidden content-stretch">
+            <!-- Footer -->
             <div
-              class="text-nowrap flex cursor-pointer items-center border-l border-zinc-300 px-2 pb-1 pt-1.5 font-semibold transition-colors duration-300 hover:bg-zinc-100/40"
-              :class="{ 'bg-zinc-200 border-zinc-300': state.selected[post.id] !== undefined ? state.selected[post.id] === index : index === post.rewritten.length - 1 }"
-              v-for="(rewrite, index) in post.rewritten" :key="index" @click="selectRewrite(post.id, index)">
-              <span class="opacity-45">v</span>
-              <span class="text-shadow=sm font-bold">{{ index }}</span>
+              class="relative -mt-3 box-content flex flex-row flex-wrap items-stretch justify-between rounded-b-lg border border-zinc-400/60 bg-zinc-100/80 pt-2 text-xs text-zinc-500"
+            >
+              <div
+                class="flex-0 flex flex-row flex-wrap divide-x divide-zinc-300 uppercase leading-none"
+              >
+                <div
+                  class="flex-0 flex items-center justify-start pb-1 pl-4 pr-2 pt-2"
+                >
+                  <iconify-icon
+                    class="mr-1 text-zinc-500"
+                    icon="mdi:heart-outline"
+                  ></iconify-icon>
+                  <span>{{ post.likesCount }}</span>
+                </div>
+                <div
+                  class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
+                >
+                  <iconify-icon
+                    class="mr-1 text-zinc-500"
+                    icon="mdi:share-outline"
+                  ></iconify-icon>
+                  <span>{{ post.repostsCount }}</span>
+                </div>
+                <div
+                  class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
+                >
+                  <iconify-icon
+                    class="mr-1 text-zinc-500"
+                    icon="mdi:eye-outline"
+                  ></iconify-icon>
+                  <span>{{ post.viewsCount }}</span>
+                </div>
+                <div
+                  class="flex-0 flex items-center justify-start px-2 pb-1 pt-1.5"
+                  v-if="photos.length > 0 || links.length > 0"
+                >
+                  <iconify-icon
+                    class="mr-1 text-zinc-500"
+                    icon="mdi:attachment"
+                  ></iconify-icon>
+                  <span
+                    >{{ links.length + photos.length }}</span
+                  >
+                </div>
+              </div>
+              <div
+                class="right-0 flex h-full w-full flex-1 flex-row content-stretch items-stretch justify-end overflow-hidden"
+              >
+                <div
+                  class="text-nowrap flex cursor-pointer items-center border-l border-zinc-300 px-2 pb-1 pt-1.5 font-semibold transition-colors duration-300 hover:bg-zinc-100/40"
+                  :class="{ 'bg-zinc-200 border-zinc-300': state.selected !== undefined ? state.selected === index : index === post.rewritten.length - 1 }"
+                  v-for="(rewrite, index) in post.rewritten"
+                  :key="index"
+                  @click="setSelectedIndex(index)"
+                >
+                  <span class="opacity-45">v</span>
+                  <span class="text-shadow=sm font-bold">{{ index }}</span>
+                </div>
+                <div
+                  class="text-nowrap flex cursor-pointer items-center justify-center rounded-br-lg border-l border-zinc-300 px-2 pb-1 pt-2 font-bold transition-colors duration-300 hover:bg-zinc-50"
+                  :class="{ 'text-green-500': !state.failed, 'text-red-500': state.failed }"
+                  @click="fetchRewritePost(post.id)"
+                >
+                  <iconify-icon
+                    class="inline-flex text-xl"
+                    icon="ion:load-d"
+                  ></iconify-icon>
+                </div>
+              </div>
             </div>
+          </div>
+        `,
+      });
+
+      const HeaderComponent = defineComponent({
+        name: "header-component",
+        setup() {
+          const postsStore = usePostsStore();
+          const postsLength = computed(() => postsStore.getPosts.length);
+          const scrollToTop = () => {
+            window.scrollTo({
+              top: 0,
+              behavior: "smooth",
+            });
+          };
+
+          return {
+            postsLength,
+            fetchPosts: async () => {
+              await postsStore.fetchPosts();
+              scrollToTop();
+            },
+          };
+        },
+        template: `
+          <h1
+            class="max-w-screen sticky top-0 z-50 mx-auto mb-8 flex w-full cursor-pointer flex-row items-center justify-center gap-4 rounded-b-xl border-b border-b-zinc-600 bg-zinc-800/95 py-3 shadow-lg shadow-zinc-400/40 backdrop-blur transition-colors duration-500 hover:text-zinc-50"
+              @click="fetchPosts"
+            >
             <div
-              class="flex items-center justify-center px-2 pt-2 pb-1 font-bold text-green-600 transition-colors duration-300 border-l rounded-br-lg cursor-pointer text-nowrap border-zinc-300 hover:bg-zinc-50"
-              @click="fetchRewritePost(post.id)">
-              <iconify-icon class="inline-flex text-xl" icon="ion:load-d"></iconify-icon>
+              class="mx-auto flex max-w-3xl flex-1 flex-row items-center justify-between px-4"
+            >
+              <div
+                class="drop-shadow-zinc-100 mr-4 inline-flex h-full flex-row items-center justify-center text-xl font-bold leading-none text-zinc-50 drop-shadow-xl"
+              >
+                <iconify-icon
+                  class="mr-2 inline-flex text-2xl text-zinc-200"
+                  icon="ion:logo-vk"
+                ></iconify-icon>
+                <span class="text-zinc-50">Group Monitor</span>
+              </div>
+              <div
+                class="inline-flex items-center justify-center rounded-md border border-zinc-500 bg-zinc-700 px-1 py-1 text-sm font-bold leading-none shadow shadow-zinc-800/20 transition-colors duration-300 hover:border-zinc-500/80 hover:bg-zinc-800"
+              >
+                <span class="mx-1 text-zinc-100">{{ postsLength }}</span>
+                <iconify-icon
+                  class="inline-flex text-zinc-100/80"
+                  icon="ion:newspaper-sharp"
+                ></iconify-icon>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+          </h1>
+        `,
+      });
 
-  <script>
-    const { createApp, ref, defineComponent } = Vue;
+      const usePostsStore = defineStore("posts", {
+        state: () => ({
+          posts: new Map(),
+          groups: new Map(),
+        }),
+        actions: {
+          async fetchPosts() {
+            const response = await fetch("/api/posts");
+            const { data: posts, success, error } = await response.json();
+            if (success) {
+              posts.forEach((post) => {
+                this.posts.set(post.id, {
+                  ...post,
+                  rewritten: [
+                    {
+                      title: "Оригинальный текст",
+                      content: post.original,
+                    },
+                    ...post.rewritten,
+                  ],
+                });
+              });
 
-    const PostComponent = defineComponent({
-      name: "post-component",
-      props: {
-        post: {
-          type: Object,
-          required: true,
-        },
-      },
-      setup(props) {
-        const {
-          title,
-          content,
-          key_points,
-          practical_advice,
-          hashtags,
-          source_link,
-          visual_element,
-          poll_question
-        } = props.post;
+              return {
+                success,
+                posts,
+              };
+            }
 
-        return {
-          title,
-          content,
-          key_points,
-          practical_advice,
-          hashtags,
-          source_link,
-          visual_element,
-          poll_question,
-        }
-      },
-      template: `
-        <div class="flex flex-col items-start justify-start gap-4">
-          <div v-if="title" class="flex flex-col items-start justify-start gap-1">
-            <!-- <span class="text-xs font-bold iconify-inline text-zinc-500">Заголовок:</span>  -->
-            <h4 class="flex flex-col items-start mb-0 text-lg font-semibold leading-tight text-zinc-600">
-              <span class="text-zinc-600">{{ title }}</span>
-            </h4>
-          </div>
-          <div v-if="content" class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Контент:</span>
-            <div class="flex flex-col items-start justify-start">
-              <span class="text-zinc-600">{{ content }}</span>
-            </div>
-          </div>
-          <div v-if="poll_question" class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Опрос:</span>
-            <div class="flex flex-row items-center">
-              <span class="text-zinc-600">{{ poll_question }}</span>
-            </div>
-          </div>
-          <div class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Ключевые точки:</span>
-            <div class="flex flex-col items-start w-full">
-              <span v-for="key_point in key_points" class="text-zinc-600">{{ key_point }}</span>
-            </div>
-          </div>
-          <div class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Практические советы:</span>
-            <div class="flex flex-col items-start justify-start">
-              <span class="text-zinc-600">{{ practical_advice }}</span>
-            </div>
-          </div>
-          <div class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Хэштеги:</span>
-            <div class="flex flex-col items-start justify-start">
-              <span v-for="hashtag in hashtags" class="text-zinc-600">{{ hashtag }}</span>
-            </div>
-          </div>
-          <div class="flex flex-col items-start justify-start gap-1">
-            <span class="text-xs font-bold iconify-inline text-zinc-500">Ссылка:</span>
-            <div class="flex flex-col items-start justify-start">
-              <a target="_blank" :href="source_link" class="text-zinc-600">{{ source_link }}</a>
-            </div>
-          </div>
-        </div>
-      `,
-    });
-
-    const app = createApp({
-      data() {
-        return {
-          posts: [],
-          groups: [],
-          state: {
-            loading: {},
-            opened: {},
-            selected: {},
-            position: {},
-          },
-        };
-      },
-      methods: {
-        scrollToTop() {
-          window.scrollTo({
-            top: 0,
-            left: 0,
-            behavior: "smooth",
-          });
-        },
-        toggleOriginal(postId) {
-          this.state.opened[postId] = !this.state.opened[postId];
-        },
-        selectRewrite(postId, index) {
-          this.state.selected[postId] = index;
-        },
-        async fetchRewritePost(postId) {
-          this.state.loading[postId] = true;
-
-          const postIndex = this.posts.findIndex((p) => p.id === postId);
-          const postResponse = await fetch(`/api/posts/${postId}/rewrite`, {
-            method: "POST",
-            headers: [
-              ["Content-Type", "application/json"],
-            ]
-          });
-
-          const post = await postResponse.json();
-          if (post.success) {
-            this.posts[postIndex] = {
-              ...this.posts[postIndex],
-              rewritten: [
-                this.posts[postIndex].original,
-                ...post.data.rewritten
-              ]
+            return {
+              error,
             };
-            this.state.selected[postId] = post.data.rewritten.length;
-          }
+          },
+          async fetchGroups() {
+            const groupsResponse = await fetch("/api/groups");
+            const {
+              data: groups,
+              success,
+              error,
+            } = await groupsResponse.json();
+            if (success) {
+              groups.forEach((group) => {
+                this.groups.set(group.id, group);
+              });
 
-          this.state.loading[postId] = false;
+              return {
+                success,
+                groups,
+              };
+            }
+
+            return {
+              error,
+            };
+          },
+          async fetchRewritePost(postId) {
+            const postResponse = await fetch(`/api/posts/${postId}/rewrite`, {
+              method: "POST",
+              headers: [["Content-Type", "application/json"]],
+            });
+            const { data: post, success } = await postResponse.json();
+            if (success) {
+              this.posts.set(postId, {
+                ...post,
+                rewritten: [
+                  {
+                    title: "Оригинальный текст",
+                    content: post.original,
+                  },
+                  ...post.rewritten,
+                ],
+              });
+            }
+          },
         },
-        async fetchPosts() {
-          const postsResponse = await fetch("/api/posts");
-          const posts = await postsResponse.json();
-
-          const groupsResponse = await fetch("/api/groups");
-          const groups = await groupsResponse.json();
-
-          this.groups = groups.data;
-
-          if (posts.success) {
-            this.posts = posts.data.map((post) => ({
-              ...post,
-              rewritten: [
-                post.original,
-                ...post.rewritten
-              ]
-            }));
-          } else {
-            this.posts = [{ error: posts.error }];
-          }
+        getters: {
+          getPost: (state) => (postId) => state.posts.get(postId),
+          getGroup: (state) => (groupId) => state.groups.get(groupId),
+          getPosts: (state) => Array.from(state.posts.values()),
+          getGroups: (state) => Array.from(state.groups.values()),
         },
-        getGroup(groupId) {
-          return this.groups.find((state) => state.id === groupId);
-        },
-        formatDate(date) {
-          return new Date(date * 1000).toLocaleString();
-        },
-      },
-      async mounted() {
-        await this.fetchPosts();
-      },
-    })
+      });
 
-    app.component('PostComponent', PostComponent)
-    app.mount('#app')
-  </script>
-</body>
+      const app = createApp({
+        components: {
+          "post-component": PostComponent,
+          "header-component": HeaderComponent,
+        },
+        template: `
+          <div class="mx-auto flex w-full max-w-screen-lg flex-col items-center justify-center bg-zinc-100">
+            <header-component />
 
+            <div class="mx-auto max-w-3xl px-4">
+              <post-component
+                v-for="post in posts"
+                :key="post.id"
+                :post-id="post.id"
+                class="text-wrap w-full whitespace-pre-wrap break-words font-sans text-xs"
+              ></post-component>
+            </div>
+          </div>
+        `,
+        setup() {
+          const postsStore = usePostsStore();
+          const posts = computed(() => postsStore.getPosts);
+          const groups = computed(() => postsStore.getGroups);
+
+          return {
+            posts,
+            groups,
+            scrollToTop: () =>
+              window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+              }),
+          };
+        },
+        async mounted() {
+          const postsStore = usePostsStore();
+
+          await postsStore.fetchGroups();
+          await postsStore.fetchPosts();
+        },
+      });
+
+      const pinia = createPinia();
+
+      app.use(pinia);
+      app.component("post-component", PostComponent);
+      app.component("header-component", HeaderComponent);
+      app.mount("#app");
+    </script>
+    <style>
+      .simplebar-content::before {
+        content: none !important;
+      }
+    </style>
+  </body>
 </html>

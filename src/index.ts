@@ -16,6 +16,7 @@ import type {
   VKGroupMonitorPost,
 } from "./lib/types";
 import { Post, validatePost } from "./lib/ajv";
+import { jsonrepair } from "jsonrepair";
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   // Private fields
@@ -28,12 +29,12 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     frequency_penalty: number;
     presence_penalty: number;
   } = {
-    temperature: 0.7,
-    max_tokens: 1500,
-    top_p: 1.0,
-    frequency_penalty: 0.0,
-    presence_penalty: 0.0,
-  };
+      temperature: 0.7,
+      max_tokens: 1500,
+      top_p: 1.0,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+    };
   #gigaChatApiKey: string = "";
   #gigachatAccessToken: string | null = null;
   #vkAccessToken: string = "";
@@ -429,15 +430,19 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   validatePost(data: string): Post | string {
     try {
-      const post = JSON.parse(data) as Post;
+      const repairedData = jsonrepair(data);
+      const post = JSON.parse(repairedData) as Post;
       const isValid = validatePost(post);
+
       if (!isValid) {
-        return data;
+        console.log("post is not valid", post);
+        return repairedData;
       }
 
       console.log("post is valid", post);
       return post;
     } catch (error) {
+      console.log("error", error);
       return data;
     }
   }

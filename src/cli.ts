@@ -16,7 +16,6 @@ import { listen } from "listhen";
 import { createBasicAuthMiddleware } from "h3-basic-auth";
 
 import type { VKGroupMonitorConfig } from "./lib/types";
-import fs from "unstorage/drivers/fs";
 import { readFileSync } from "node:fs";
 import { createServeStaticHandler } from "./lib/static";
 

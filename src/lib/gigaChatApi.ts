@@ -94,6 +94,17 @@ export async function getGigaChatTokensCount(
 
     logger.debug("getGigaChatTokensCount response", json);
 
+    if (!Array.isArray(json)) {
+      logger.error("getGigaChatTokensCount response is empty", json);
+      throw createError({
+        code: "GIGACHAT_API_GET_TOKENS_COUNT_ERROR",
+        cause: new Error("Invalid response"),
+        expected: true,
+        transient: false,
+        data: {},
+      });
+    }
+
     json.forEach((data, index) => {
       if (input[index]) {
         input[index].tokens = data.tokens;

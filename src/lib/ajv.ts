@@ -15,10 +15,6 @@ const schema = {
   required: [
     "title",
     "content",
-    "key_points",
-    "practical_advice",
-    "hashtags",
-    "source_link",
   ],
 };
 

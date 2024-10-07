@@ -1669,6 +1669,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jsonrepair@npm:^3.8.1":
+  version: 3.8.1
+  resolution: "jsonrepair@npm:3.8.1"
+  bin:
+    jsonrepair: bin/cli.js
+  checksum: 10c0/2e6a750928d8a8ac8d6cc37dc399188098267e44827e00089da6245e75f6e8aaf95e145d2a346569a518fbfb761da78e61d37d833591bd0ef0230a7d8dbd5af5
+  languageName: node
+  linkType: hard
+
 "jsonwebtoken@npm:^9.0.2":
   version: 9.0.2
   resolution: "jsonwebtoken@npm:9.0.2"
@@ -2816,6 +2825,7 @@ __metadata:
     h3: "npm:^1.12.0"
     h3-basic-auth: "npm:^0.0.1"
     js-yaml: "npm:^4.1.0"
+    jsonrepair: "npm:^3.8.1"
     level: "npm:^8.0.1"
     listhen: "npm:^1.8.0"
     module-error: "npm:^1.0.2"
