@@ -215,7 +215,7 @@
       template: `
           <div
             class="mb-6 overflow-hidden rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20"
-            :class="{ 'shadow-none': state.loading }"
+            :class="{ 'shadow-sm': state.loading }"
           >
             <div
               ref="content"
@@ -223,7 +223,7 @@
               @blur="resetScrollableHook"
               @click="resetScrollableHook"
               class="relative z-30 cursor-default rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 leading-tight text-zinc-600 shadow-inner shadow-zinc-300/60 overflow-y-hidden"
-              :class="{ 'max-h-36 select-none': !state.opened }"
+              :class="{ 'max-h-40 select-none': !state.opened }"
             >
               <div
                 class="pointer-events-none absolute bottom-0 left-0 right-0 top-0 z-20 flex flex-1 items-center justify-center rounded-lg bg-zinc-200/40 leading-none shadow filter backdrop-blur-lg transition-opacity duration-300"
