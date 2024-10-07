@@ -43,7 +43,7 @@
       <div class="relative mb-6 rounded-lg bg-zinc-300/60 pb-0 shadow-lg shadow-zinc-500/20" v-for="post in posts"
         :key="post.id">
         <div :class="{ 'max-h-36 overflow-hidden': !state.opened[post.id] }"
-          class="relative z-30 cursor-default divide-y divide-dashed divide-zinc-400/40 rounded-lg border-x border-y border-zinc-400/80 border-b-zinc-500/60 bg-zinc-50 pb-4 leading-tight text-zinc-600 shadow-lg shadow-zinc-400/20">
+          class="relative z-30 cursor-default divide-y divide-dashed divide-zinc-400/40 rounded-lg border border-zinc-400/60 border-b-zinc-500/40 bg-zinc-50 pb-4 leading-tight text-zinc-600 shadow-inner shadow-lg shadow-zinc-300/60">
           <div @click="toggleOriginal(post.id)"
             class="text-md flex cursor-pointer flex-row items-center justify-center rounded-t-lg bg-zinc-100 px-4 py-2 font-bold leading-none sm:justify-between">
             <img
@@ -112,7 +112,7 @@
 
         <!-- Footer -->
         <div
-          class="relative -mt-3 box-content flex flex-row flex-wrap items-stretch justify-between rounded-b-lg border border-zinc-400/80 bg-zinc-100/80 pt-2 text-xs text-zinc-500">
+          class="relative -mt-3 box-content flex flex-row flex-wrap items-stretch justify-between rounded-b-lg border border-zinc-400/60 bg-zinc-100/80 pt-2 text-xs text-zinc-500">
           <div class="flex-0 flex flex-row flex-wrap divide-x divide-zinc-300 uppercase leading-none">
             <div class="flex-0 flex items-center justify-start pb-1 pl-4 pr-2 pt-2">
               <iconify-icon class="mr-1 text-zinc-500" icon="mdi:heart-outline"></iconify-icon>
