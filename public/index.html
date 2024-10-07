@@ -581,6 +581,14 @@
       },
 
       async mounted() {
+        OverlayScrollbars(document.body, {
+          plugins: [
+            ScrollbarsHidingPlugin,
+            SizeObserverPlugin,
+            ClickScrollPlugin,
+          ],
+        });
+
         const postsStore = usePostsStore();
 
         await postsStore.fetchGroups();
