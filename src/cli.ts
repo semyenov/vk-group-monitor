@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import yaml from "js-yaml";
-import { stat, readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "pathe";
 
 import { VKGroupMonitor } from "./index";
@@ -8,8 +8,8 @@ import {
   createApp,
   createRouter,
   defineEventHandler,
-  serveStatic,
   getRouterParam,
+  serveStatic,
   toNodeListener,
 } from "h3";
 import { listen } from "listhen";
@@ -35,6 +35,13 @@ const config: VKGroupMonitorConfig = {
     username: process.env.AUTH_USERNAME || "admin",
     password: process.env.AUTH_PASSWORD || "password",
     sessionSecret: process.env.AUTH_SESSION_SECRET || "secret",
+  },
+  parameters: {
+    temperature: 0.7,
+    max_tokens: 1500,
+    top_p: 1.0,
+    frequency_penalty: 0.0,
+    presence_penalty: 0.0,
   },
   messages: [
     {
@@ -95,7 +102,10 @@ router.get(
     const posts = await monitor.getPosts();
     return {
       success: true,
-      data: posts,
+      data: posts.map((post) => ({
+        ...post,
+        rewritten: post.rewritten.map((post) => monitor.validatePost(post)),
+      })),
     };
   }),
 );
@@ -121,7 +131,10 @@ router.get(
 
     return {
       success: true,
-      data: post,
+      data: {
+        ...post,
+        rewritten: post.rewritten.map((post) => monitor.validatePost(post)),
+      },
     };
   }),
 );
@@ -146,9 +159,21 @@ router.post(
     }
 
     const rewrittenPost = await monitor.processPost(post);
+    if (!rewrittenPost) {
+      return {
+        success: false,
+        error: "Failed to rewrite post",
+      };
+    }
+
     return {
       success: true,
-      data: rewrittenPost,
+      data: {
+        ...rewrittenPost,
+        rewritten: rewrittenPost.rewritten.map((post) =>
+          monitor.validatePost(post)
+        ),
+      },
     };
   }),
 );

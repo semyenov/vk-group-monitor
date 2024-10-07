@@ -7,7 +7,7 @@ import { createError } from "./errors";
 const logger = createConsola({ defaults: { tag: "GigaChatApi" } });
 
 export async function updateGigachatAccessToken(
-  gigaChatApiKey: string
+  gigaChatApiKey: string,
 ): Promise<string | null> {
   logger.debug("updateGigachatAccessToken");
 
@@ -23,7 +23,7 @@ export async function updateGigachatAccessToken(
           RqUID: randomUUID(),
         },
         body: new URLSearchParams([["scope", "GIGACHAT_API_PERS"]]),
-      }
+      },
     );
 
     const json = (await response.json()) as { access_token: string };
@@ -44,7 +44,7 @@ export async function getGigaChatTokensCount(
   text: string,
   clientId: string,
   gigaChatApiKey: string,
-  gigachatAccessToken: string
+  gigachatAccessToken: string,
 ): Promise<
   {
     index: number;
@@ -83,7 +83,7 @@ export async function getGigaChatTokensCount(
           Authorization: `Bearer ${gigachatAccessToken}`,
         },
         body,
-      }
+      },
     );
 
     const json = (await response.json()) as {
@@ -117,9 +117,16 @@ export async function getGigaChatTokensCount(
 export async function getGigaChatRewritePost(
   text: string,
   messages: { role: string; content: string }[],
+  parameters: {
+    temperature: number;
+    max_tokens: number;
+    top_p: number;
+    frequency_penalty: number;
+    presence_penalty: number;
+  },
   clientId: string,
   gigaChatApiKey: string,
-  gigachatAccessToken: string
+  gigachatAccessToken: string,
 ): Promise<string | null> {
   logger.debug("getGigaChatRewritePost", text);
 
@@ -127,7 +134,7 @@ export async function getGigaChatRewritePost(
     text,
     clientId,
     gigaChatApiKey,
-    gigachatAccessToken
+    gigachatAccessToken,
   );
 
   const maxTokens = 120000;
@@ -151,6 +158,7 @@ export async function getGigaChatRewritePost(
   }
 
   const body = JSON.stringify({
+    ...parameters,
     model: "GigaChat",
     stream: false,
     update_interval: 0,
@@ -176,14 +184,14 @@ export async function getGigaChatRewritePost(
           Authorization: `Bearer ${gigachatAccessToken}`,
         },
         body,
-      }
+      },
     );
 
     const json = (await response.json()) as {
       choices: { message: { content: string } }[];
     };
 
-    logger.debug("getGigaChatRewritePost response", json);
+    logger.info("getGigaChatRewritePost response", json);
 
     return json.choices.map((choice) => choice.message.content).join("\n");
   } catch (error) {
@@ -191,7 +199,9 @@ export async function getGigaChatRewritePost(
       error instanceof FetchError &&
       error.code === "401"
     ) {
-      const gigachatAccessToken = await updateGigachatAccessToken(gigaChatApiKey);
+      const gigachatAccessToken = await updateGigachatAccessToken(
+        gigaChatApiKey,
+      );
       if (!gigachatAccessToken) {
         throw createError({
           code: "GIGACHAT_API_ACCESS_TOKEN_ERROR",
@@ -205,9 +215,10 @@ export async function getGigaChatRewritePost(
       return getGigaChatRewritePost(
         text,
         messages,
+        parameters,
         clientId,
         gigaChatApiKey,
-        gigachatAccessToken
+        gigachatAccessToken,
       );
     }
 

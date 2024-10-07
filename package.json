@@ -32,6 +32,7 @@
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.7.2",
+    "ajv": "^8.17.1",
     "consola": "^3.2.3",
     "h3": "^1.12.0",
     "h3-basic-auth": "^0.0.1",

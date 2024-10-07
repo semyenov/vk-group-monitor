@@ -17,6 +17,7 @@ export const ERROR_MESSAGES = {
   GROUP_IDS_NOT_SET_ERROR: "group ids is not set or invalid in configuration",
   DB_DIR_NOT_SET_ERROR: "db dir is not set in configuration",
   VK_ACCESS_TOKEN_NOT_SET_ERROR: "vk access token is not set in configuration",
+  POST_VALIDATION_ERROR: "post validation failed",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

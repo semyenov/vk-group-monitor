@@ -15,11 +15,25 @@ import type {
   VKGroupMonitorGroup,
   VKGroupMonitorPost,
 } from "./lib/types";
+import { Post, validatePost } from "./lib/ajv";
 
 export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
   // Private fields
   #clientId: string = randomUUID();
   #groupIds: number[] = [];
+  #parameters: {
+    temperature: number;
+    max_tokens: number;
+    top_p: number;
+    frequency_penalty: number;
+    presence_penalty: number;
+  } = {
+    temperature: 0.7,
+    max_tokens: 1500,
+    top_p: 1.0,
+    frequency_penalty: 0.0,
+    presence_penalty: 0.0,
+  };
   #gigaChatApiKey: string = "";
   #gigachatAccessToken: string | null = null;
   #vkAccessToken: string = "";
@@ -86,6 +100,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
 
   #initializeState(config: VKGroupMonitorConfig): void {
     this.#vkAccessToken = config.vkAccessToken;
+    this.#parameters = config.parameters;
     this.#gigaChatApiKey = config.gigachatApiKey;
     this.#pollInterval = config.pollInterval;
     this.#postsPerRequest = config.postsPerRequest;
@@ -238,6 +253,7 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
     return await gigaChatApi.getGigaChatRewritePost(
       text,
       this.#messages,
+      this.#parameters,
       this.#clientId,
       this.#gigaChatApiKey,
       this.#gigachatAccessToken!,
@@ -408,6 +424,21 @@ export class VKGroupMonitor extends EventEmitter<VKGroupMonitorEvents> {
       logger.debug("getGroup error", error);
 
       return null;
+    }
+  }
+
+  validatePost(data: string): Post | string {
+    try {
+      const post = JSON.parse(data) as Post;
+      const isValid = validatePost(post);
+      if (!isValid) {
+        return data;
+      }
+
+      console.log("post is valid", post);
+      return post;
+    } catch (error) {
+      return data;
     }
   }
 
