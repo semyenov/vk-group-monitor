@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="initial-scale=1, viewport-fit=cover" />
   <link href="/favicon.ico" rel="icon" />
 
   <title>VK Group Monitor Posts</title>
@@ -64,7 +64,7 @@
     //** @type {import('vue').Component} */
     const { createApp, defineComponent, ref, toRef, computed, watch } = Vue;
     const { createPinia, defineStore } = Pinia;
-    const { useToggle, onLongPress, useActiveElement } = VueUse;
+    const { useToggle, onLongPress, useActiveElement, useScrollLock } = VueUse;
     var {
       OverlayScrollbars,
       ScrollbarsHidingPlugin,
@@ -96,7 +96,6 @@
 
         const [opened, toggleOpened] = useToggle(false);
         const [loading, toggleLoading] = useToggle(false);
-        const [scrollable, toggleScrollable] = useToggle(false);
 
         const selectedIndex = ref(post.value.rewritten.length - 1);
         const setSelectedIndex = (index) => (selectedIndex.value = index);
@@ -106,8 +105,10 @@
 
         const failed = computed(() => typeof selected.value === "string");
         const activeElement = useActiveElement();
+        const scrollable = useScrollLock(content);
 
         watch(activeElement, (a) => {
+          console.log(a.isSameNode(content.value), a, content.value)
           toggleScrollable(a.isSameNode(content.value))
         })
 
@@ -120,20 +121,20 @@
         }));
 
         function onLongPressCallbackHook(e) {
-          toggleScrollable(true)
+          scrollable.value = true
         }
         function resetHook() {
-          toggleScrollable(false)
+          scrollable.value = false
         }
 
         onLongPress(
           content,
           onLongPressCallbackHook,
           {
-
+            delay: 200,
             modifiers: {
-              prevent: true
-
+              stop: true,
+              prevent: true,
             }
           }
         )
