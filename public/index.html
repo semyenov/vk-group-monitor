@@ -444,8 +444,8 @@
         return {
           postsLength,
           fetchPosts: async () => {
-            await postsStore.fetchPosts();
             scrollToTop();
+            await postsStore.fetchPosts();
           },
         };
       },
